@@ -3042,6 +3042,54 @@ mod slow {
     }
 
     #[tokio::test]
+    async fn below_pool_minimum_counted_as_funds() {
+        // Show that the LRZ Proposer includes below fee-threshold funds as available, when it is not
+        // for cross pool transfer
+        let (regtest_manager, _cph, mut client_builder, regtest_network) =
+            scenarios::custom_clients_default().await;
+        let sapling_faucet = client_builder.build_faucet(false, regtest_network).await;
+        let recipient = client_builder
+            .build_client(HOSPITAL_MUSEUM_SEED.to_string(), 0, false, regtest_network)
+            .await;
+        let recipient_taddr = get_base_address_macro!(recipient, "transparent");
+        let recipient_unified = get_base_address_macro!(recipient, "unified");
+        // Ensure that the client has confirmed spendable funds
+        zingo_testutils::increase_height_and_wait_for_client(&regtest_manager, &sapling_faucet, 3)
+            .await
+            .unwrap();
+        macro_rules! bump_and_check_recipient {
+            (o: $o:tt s: $s:tt t: $t:tt) => {
+                zingo_testutils::increase_height_and_wait_for_client(&regtest_manager, &recipient, 1).await.unwrap();
+                check_client_balances!(recipient, o:$o s:$s t:$t);
+            };
+        }
+
+        from_inputs::quick_send(&sapling_faucet, vec![(&recipient_unified, 10_000, None)])
+            .await
+            .unwrap();
+        bump_and_check_recipient!(o: 10_000 s: 0 t: 0);
+
+        // Recipient fails to send due to insufficient funds
+        match from_inputs::quick_send(&recipient, vec![(&recipient_taddr, 1, None)]).await {
+            Ok(_) => panic!(),
+            Err(QuickSendError::ProposeSend(proposesenderror)) => match proposesenderror {
+                ProposeSendError::Proposal(insufficient) => match insufficient {
+                    zcash_client_backend::data_api::error::Error::InsufficientFunds {
+                        available,
+                        required,
+                    } => {
+                        assert_eq!(required, NonNegativeAmount::from_u64(15_001).unwrap()); // Correctly includes zip317 FEE!!
+                        assert_eq!(available, NonNegativeAmount::from_u64(0).unwrap());
+                        // Incorrectly shows as "available" funds that do not have requirement subtracted!!
+                    }
+                    _ => panic!(),
+                },
+                _ => panic!(),
+            },
+            _ => panic!(),
+        }
+    }
+    #[tokio::test]
     async fn from_t_z_o_tz_to_zo_tzo_to_orchard() {
         // Test all possible promoting note source combinations
         // This test includes combinations that are disallowed in the mobile
