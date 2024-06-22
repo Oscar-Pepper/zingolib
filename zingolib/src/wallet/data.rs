@@ -450,8 +450,6 @@ pub mod finsight {
 pub mod summaries {
     use chrono::DateTime;
     use json::JsonValue;
-    use zcash_address::ZcashAddress;
-    use zcash_client_backend::PoolType;
     use zcash_primitives::{consensus::BlockHeight, transaction::TxId};
     use zingo_status::confirmation_status::ConfirmationStatus;
 
@@ -480,45 +478,48 @@ pub mod summaries {
     }
 
     impl ValueTransfer {
-        /// TODO: doc comment
+        /// The txid of the transaction in which the relevant outputs
+        /// were created.
         pub fn txid(&self) -> TxId {
             self.txid
         }
-        /// TODO: doc comment
+        /// Time at which the containing transaction was created?
         pub fn datetime(&self) -> u64 {
             self.datetime
         }
-        /// TODO: doc comment
+        /// Whether the transaction is on chain.
         pub fn status(&self) -> ConfirmationStatus {
             self.status
         }
-        /// TODO: doc comment
+        /// Height of confirming block?
         pub fn blockheight(&self) -> BlockHeight {
             self.blockheight
         }
-        /// TODO: doc comment
+        /// How much did the transaction cost to validate.
         pub fn transaction_fee(&self) -> Option<u64> {
             self.transaction_fee
         }
-        /// TODO: doc comment
+        /// The exchange rate at creation time?
         pub fn zec_price(&self) -> Option<f64> {
             self.zec_price
         }
-        /// TODO: doc comment
+        /// The intention of the value transfer relative to this Capability.
         pub fn kind(&self) -> ValueTransferKind {
             self.kind
         }
-        /// TODO: doc comment
+        /// How much value is transferred.
         pub fn value(&self) -> u64 {
             self.value
         }
-        /// TODO: doc comment
+        /// Who the recipient is.
         pub fn recipient_address(&self) -> Option<&str> {
             self.recipient_address.as_deref()
         }
+        /// Which pool the receiver is in.
         pub fn pool_received(&self) -> Option<&str> {
             self.pool_received.as_deref()
         }
+        /// The set of memos transferred.
         pub fn memos(&self) -> Vec<&str> {
             self.memos.iter().map(|s| s.as_str()).collect()
         }
@@ -559,12 +560,12 @@ pub mod summaries {
             } else {
                 "not available".to_string()
             };
-            let recipient_address = if let Some(addr) = self.recipient_address {
+            let recipient_address = if let Some(addr) = self.recipient_address.clone() {
                 addr
             } else {
                 "not available".to_string()
             };
-            let pool_received = if let Some(pool) = self.pool_received {
+            let pool_received = if let Some(pool) = self.pool_received.clone() {
                 pool
             } else {
                 "not available".to_string()
@@ -621,16 +622,21 @@ pub mod summaries {
         }
     }
 
-    /// TODO: Add Doc Comment Here!
-    #[derive(Clone, PartialEq, Eq, Debug)]
+    /// A set of outputs within a transaction that
+    /// are sent to the same address are grouped
+    /// into a "ValueTransfer". There are 4 variants
+    /// tracked here.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum ValueTransferKind {
-        /// TODO: Add Doc Comment Here!
+        /// The receiver is not controlled by the creating Capability (Creator)
         Sent,
-        /// TODO: Add Doc Comment Here!
+        /// The receiver is shielded, and controlled by the Creator
+        /// The whole transaction is created to shield.
         Shield,
-        /// TODO: Add Doc Comment Here!
+        /// The receiver is controlled by the Creator, the transaction
+        /// also has non-Creator receivers.
         NoteToSelf,
-        /// TODO: Add Doc Comment Here!
+        /// The Creator is not this Capability
         Received,
     }
 
