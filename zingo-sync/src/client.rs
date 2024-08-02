@@ -31,7 +31,7 @@ pub async fn get_chain_height(
 
     Ok(BlockHeight::from_u32(chain_tip.height as u32))
 }
-/// Gets the height of the blockchain from the server.
+/// Gets a range of blocks from the server
 ///
 /// Requires [`crate::client::fetcher::fetcher`] to be running concurrently, connected via the `fetch_request` channel.
 #[allow(dead_code)]

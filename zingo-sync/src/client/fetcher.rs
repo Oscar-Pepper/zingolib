@@ -21,22 +21,24 @@ use crate::client::FetchRequest;
 /// Allows all requests to the server to be handled from a single task for efficiency and also enables
 /// request prioritisation for further performance enhancement
 pub async fn fetcher(
-    mut fetch_request_receiver: UnboundedReceiver<FetchRequest>,
-    mut client: CompactTxStreamerClient<zingo_netutils::UnderlyingService>,
+    mut requests: UnboundedReceiver<FetchRequest>,
+    mut indexer_client: CompactTxStreamerClient<zingo_netutils::UnderlyingService>,
 ) -> Result<(), ()> {
     let mut fetch_request_queue: Vec<FetchRequest> = Vec::new();
 
     loop {
         // `fetcher` returns `Ok` here when all requests have successfully been fetched and the
         // fetch_request channel is closed on sync completion.
-        if receive_fetch_requests(&mut fetch_request_receiver, &mut fetch_request_queue).await {
+        if queue_requests(&mut requests, &mut fetch_request_queue).await {
             return Ok(());
         }
 
         let fetch_request = select_fetch_request(&mut fetch_request_queue);
 
         if let Some(request) = fetch_request {
-            fetch_from_server(&mut client, request).await.unwrap();
+            fetch_from_server(&mut indexer_client, request)
+                .await
+                .unwrap();
         }
     }
 }
@@ -45,22 +47,15 @@ pub async fn fetcher(
 //
 // returns `true` if the fetch request channel is closed and all fetch requests have been completed,
 // signalling sync is complete and no longer needs to fetch data from the server.
-async fn receive_fetch_requests(
-    receiver: &mut UnboundedReceiver<FetchRequest>,
+async fn queue_requests(
+    requests: &mut UnboundedReceiver<FetchRequest>,
     fetch_request_queue: &mut Vec<FetchRequest>,
 ) -> bool {
-    // if there are no fetch requests to process, sleep until the next fetch request is received
-    // or channel is closed
-    if fetch_request_queue.is_empty() {
-        while let Some(fetch_request) = receiver.recv().await {
-            fetch_request_queue.push(fetch_request);
-        }
-    }
     // receive all remaining fetch requests from channel
     // when channel is empty return `false` to continue fetching data from the server
     // when channel is closed and all fetch requests are processed, return `true`
     loop {
-        match receiver.try_recv() {
+        match requests.try_recv() {
             Ok(fetch_request) => fetch_request_queue.push(fetch_request),
             Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
             Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
