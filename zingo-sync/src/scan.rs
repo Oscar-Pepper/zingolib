@@ -165,6 +165,8 @@ where
     .await
     .unwrap();
 
+    tracing::info!("Scanning {:?}", scan_range.block_range());
+
     let initial_scan_data = InitialScanData::new(
         fetch_request_sender,
         parameters,

@@ -16,7 +16,7 @@ use crate::{client::FetchRequest, keys::ScanningKeys, primitives::WalletBlock};
 
 use super::{scan, ScanResults};
 
-const SCAN_WORKER_POOLSIZE: usize = 2;
+const SCAN_WORKER_POOLSIZE: usize = 1;
 
 pub(crate) struct Scanner<P> {
     workers: Vec<WorkerHandle>,

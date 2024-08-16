@@ -21,8 +21,8 @@ use zcash_primitives::consensus::{BlockHeight, NetworkUpgrade, Parameters};
 use futures::future::try_join_all;
 use tokio::sync::mpsc;
 
-const BATCH_SIZE: u32 = 10;
-// const BATCH_SIZE: u32 = 1_000;
+// const BATCH_SIZE: u32 = 10;
+const BATCH_SIZE: u32 = 1_000;
 
 /// Syncs a wallet to the latest state of the blockchain
 pub async fn sync<P, W>(
@@ -86,10 +86,25 @@ where
 
         match scan_results_receiver.try_recv() {
             Ok((scan_range, scan_results)) => {
+                tracing::info!("Updating {:?}", scan_range.block_range());
+                let now = tokio::time::Instant::now();
+
                 update_wallet_data(wallet, scan_results).unwrap();
+                let update_instant = tokio::time::Instant::now();
+                let update_time = update_instant.duration_since(now).as_millis();
+                tracing::info!("update_time {}", update_time);
+
                 // TODO: link nullifiers and scan linked transactions
                 remove_irrelevant_data(wallet, &scan_range).unwrap();
-                mark_scanned(scan_range, wallet.get_sync_state_mut().unwrap()).unwrap();
+                let purge_instant = tokio::time::Instant::now();
+                let purge_time = purge_instant.duration_since(now).as_millis();
+                tracing::info!("purge_time {}", purge_time);
+
+                mark_scanned(scan_range.clone(), wallet.get_sync_state_mut().unwrap()).unwrap();
+                let scanned_instant = tokio::time::Instant::now();
+                let scanned_time = scanned_instant.duration_since(now).as_millis();
+                tracing::info!("scanned_time {}", scanned_time);
+                tracing::info!("Completed {:?}", scan_range.block_range());
             }
             Err(TryRecvError::Empty) => (),
             Err(TryRecvError::Disconnected) => break,
@@ -98,10 +113,25 @@ where
 
     drop(scanner);
     while let Some((scan_range, scan_results)) = scan_results_receiver.recv().await {
+        tracing::info!("Updating {:?}", scan_range.block_range());
+        let now = tokio::time::Instant::now();
+
         update_wallet_data(wallet, scan_results).unwrap();
+        let update_instant = tokio::time::Instant::now();
+        let update_time = update_instant.duration_since(now).as_millis();
+        tracing::info!("update_time {}", update_time);
+
         // TODO: link nullifiers and scan linked transactions
         remove_irrelevant_data(wallet, &scan_range).unwrap();
-        mark_scanned(scan_range, wallet.get_sync_state_mut().unwrap()).unwrap();
+        let purge_instant = tokio::time::Instant::now();
+        let purge_time = purge_instant.duration_since(now).as_millis();
+        tracing::info!("purge_time {}", purge_time);
+
+        mark_scanned(scan_range.clone(), wallet.get_sync_state_mut().unwrap()).unwrap();
+        let scanned_instant = tokio::time::Instant::now();
+        let scanned_time = scanned_instant.duration_since(now).as_millis();
+        tracing::info!("scanned_time {}", scanned_time);
+        tracing::info!("Completed {:?}", scan_range.block_range());
     }
 
     try_join_all(handles).await.unwrap();
@@ -119,7 +149,8 @@ async fn update_scan_ranges<P>(
 where
     P: Parameters,
 {
-    let chain_height = get_chain_height(fetch_request_sender).await.unwrap();
+    // let chain_height = get_chain_height(fetch_request_sender).await.unwrap();
+    let chain_height = BlockHeight::from_u32(2_000_5000);
 
     let scan_ranges = sync_state.scan_ranges_mut();
 
@@ -225,7 +256,7 @@ where
     // must still retain top 100 blocks for re-org purposes
     wallet.append_wallet_blocks(wallet_blocks).unwrap();
     wallet.append_nullifiers(nullifiers).unwrap();
-    wallet.update_shard_trees(shard_tree_data).unwrap();
+    // wallet.update_shard_trees(shard_tree_data).unwrap();
     // TODO: add trait to save wallet data to persistance for in-memory wallets
 
     Ok(())
