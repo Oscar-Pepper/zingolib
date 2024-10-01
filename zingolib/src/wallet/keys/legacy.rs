@@ -60,9 +60,9 @@ where
 }
 
 pub(crate) fn legacy_fvks_to_ufvk<P: zcash_primitives::consensus::Parameters>(
-    orchard_fvk: Option<orchard::keys::FullViewingKey>,
-    sapling_fvk: Option<sapling_crypto::zip32::DiversifiableFullViewingKey>,
-    transparent_fvk: Option<extended_transparent::ExtendedPubKey>,
+    orchard_fvk: Option<&orchard::keys::FullViewingKey>,
+    sapling_fvk: Option<&sapling_crypto::zip32::DiversifiableFullViewingKey>,
+    transparent_fvk: Option<&extended_transparent::ExtendedPubKey>,
     parameters: &P,
 ) -> Result<UnifiedFullViewingKey, std::string::String> {
     use zcash_address::unified::Encoding;

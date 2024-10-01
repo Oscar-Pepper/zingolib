@@ -19,6 +19,7 @@ use zcash_primitives::legacy::keys::{IncomingViewingKey, NonHardenedChildIndex};
 
 use crate::config::{ChainType, ZingoConfig};
 use crate::wallet::error::KeyError;
+use crate::wallet::keys::legacy::extended_transparent::KeyIndex;
 use zcash_address::unified::{Encoding, Ufvk};
 use zcash_client_backend::address::UnifiedAddress;
 use zcash_client_backend::keys::{Era, UnifiedSpendingKey};
@@ -416,6 +417,111 @@ impl WalletCapability {
         Ok(ua)
     }
 
+    /// Generates new addresses from legacy viewing keys
+    pub(crate) fn legacy_new_address(
+        &self,
+        desired_receivers: ReceiverSelection,
+        orchard_fvk: Option<&orchard::keys::FullViewingKey>,
+        sapling_fvk: Option<&sapling_crypto::zip32::DiversifiableFullViewingKey>,
+        transparent_fvk: Option<&super::legacy::extended_transparent::ExtendedPubKey>,
+    ) -> Result<UnifiedAddress, String> {
+        if (desired_receivers.transparent & transparent_fvk.is_none())
+            || (desired_receivers.sapling & sapling_fvk.is_none()
+                || (desired_receivers.orchard & orchard_fvk.is_none()))
+        {
+            return Err("The wallet is not capable of producing desired receivers.".to_string());
+        }
+        if self
+            .addresses_write_lock
+            .swap(true, atomic::Ordering::Acquire)
+        {
+            return Err("addresses_write_lock collision!".to_string());
+        }
+        let previous_num_addresses = self.addresses.len();
+        let orchard_receiver = if desired_receivers.orchard {
+            Some(
+                orchard_fvk
+                    .expect("would have already errored if this reciever was desired with no fvk")
+                    .address_at(self.addresses.len(), orchard::keys::Scope::External),
+            )
+        } else {
+            None
+        };
+
+        // produce a Sapling address to increment Sapling diversifier index
+        let sapling_receiver = if desired_receivers.sapling {
+            let mut sapling_diversifier_index = DiversifierIndex::new();
+            let mut address;
+            let mut count = 0;
+            let fvk = sapling_fvk
+                .expect("would have already errored if this reciever was desired with no fvk");
+            loop {
+                (sapling_diversifier_index, address) = fvk
+                    .find_address(sapling_diversifier_index)
+                    .expect("Diversifier index overflow");
+                sapling_diversifier_index
+                    .increment()
+                    .expect("diversifier index overflow");
+                if count == self.addresses.len() {
+                    break;
+                }
+                count += 1;
+            }
+            Some(address)
+        } else {
+            None
+        };
+
+        let transparent_receiver = if desired_receivers.transparent {
+            let child_index = KeyIndex::from_index(self.addresses.len() as u32);
+            let child_pk = match transparent_fvk
+                .expect("would have already errored if this reciever was desired with no fvk")
+                .derive_public_key(child_index)
+            {
+                Err(e) => {
+                    self.addresses_write_lock
+                        .swap(false, atomic::Ordering::Release);
+                    return Err(format!("Transparent public key derivation failed: {e}"));
+                }
+                Ok(res) => res.public_key,
+            };
+            self.transparent_child_addresses.push((
+                self.addresses.len(),
+                #[allow(deprecated)]
+                zcash_primitives::legacy::keys::pubkey_to_address(&child_pk),
+            ));
+            Some(child_pk)
+        } else {
+            None
+        };
+        let ua = UnifiedAddress::from_receivers(
+            orchard_receiver,
+            sapling_receiver,
+            #[allow(deprecated)]
+            transparent_receiver
+                .as_ref()
+                // This is deprecated. Not sure what the alternative is,
+                // other than implementing it ourselves.
+                .map(zcash_primitives::legacy::keys::pubkey_to_address),
+        );
+        let ua = match ua {
+            Some(address) => address,
+            None => {
+                self.addresses_write_lock
+                    .swap(false, atomic::Ordering::Release);
+                return Err(
+                    "Invalid receivers requested! At least one of sapling or orchard required"
+                        .to_string(),
+                );
+            }
+        };
+        self.addresses.push(ua.clone());
+        assert_eq!(self.addresses.len(), previous_num_addresses + 1);
+        self.addresses_write_lock
+            .swap(false, atomic::Ordering::Release);
+        Ok(ua)
+    }
+
     /// TODO: Add Doc Comment Here!
     #[deprecated(note = "not used in zingolib codebase")]
     pub fn get_taddr_to_secretkey_map(
@@ -576,15 +682,30 @@ impl ReadableWriteable<ChainType, ChainType> for WalletCapability {
         let wc = match version {
             // in version 1, only spending keys are stored
             1 => {
-                // keys must be read to increment the cursor correctly but USK is derived later from seed
+                // keys must be read to create addresses but USK is derived later from seed
                 // due to missing BIP0032 transparent extended private key data
-                orchard::keys::SpendingKey::read(&mut reader, ())?;
-                sapling_crypto::zip32::ExtendedSpendingKey::read(&mut reader)?;
-                super::legacy::extended_transparent::ExtendedPrivKey::read(&mut reader, ())?;
-                Self {
+                let orchard_sk = orchard::keys::SpendingKey::read(&mut reader, ())?;
+                let sapling_sk = sapling_crypto::zip32::ExtendedSpendingKey::read(&mut reader)?;
+                let transparent_sk =
+                    super::legacy::extended_transparent::ExtendedPrivKey::read(&mut reader, ())?;
+
+                let wc = WalletCapability {
                     unified_key_store: UnifiedKeyStore::Empty,
                     ..Default::default()
+                };
+                let receiver_selections = Vector::read(reader, |r| ReceiverSelection::read(r, ()))?;
+                for rs in receiver_selections {
+                    wc.legacy_new_address(
+                        rs,
+                        Some(&orchard::keys::FullViewingKey::from(&orchard_sk)),
+                        Some(&sapling_sk.to_diversifiable_full_viewing_key()),
+                        Some(&super::legacy::extended_transparent::ExtendedPubKey::from(
+                            &transparent_sk,
+                        )),
+                    )
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
                 }
+                wc
             }
             2 => {
                 let orchard_capability = Capability::<
@@ -622,9 +743,9 @@ impl ReadableWriteable<ChainType, ChainType> for WalletCapability {
                     || transparent_fvk.is_some()
                 {
                     let ufvk = super::legacy::legacy_fvks_to_ufvk(
-                        orchard_fvk,
-                        sapling_fvk,
-                        transparent_fvk,
+                        orchard_fvk.as_ref(),
+                        sapling_fvk.as_ref(),
+                        transparent_fvk.as_ref(),
                         &input,
                     )
                     .unwrap();
@@ -632,15 +753,34 @@ impl ReadableWriteable<ChainType, ChainType> for WalletCapability {
                 } else {
                     UnifiedKeyStore::Empty
                 };
-                Self {
+                let wc = WalletCapability {
                     unified_key_store,
                     ..Default::default()
+                };
+                let receiver_selections = Vector::read(reader, |r| ReceiverSelection::read(r, ()))?;
+                for rs in receiver_selections {
+                    wc.legacy_new_address(
+                        rs,
+                        orchard_fvk.as_ref(),
+                        sapling_fvk.as_ref(),
+                        transparent_fvk.as_ref(),
+                    )
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
                 }
+                wc
             }
-            3 => Self {
-                unified_key_store: UnifiedKeyStore::read(&mut reader, input)?,
-                ..Default::default()
-            },
+            3 => {
+                let wc = WalletCapability {
+                    unified_key_store: UnifiedKeyStore::read(&mut reader, input)?,
+                    ..Default::default()
+                };
+                let receiver_selections = Vector::read(reader, |r| ReceiverSelection::read(r, ()))?;
+                for rs in receiver_selections {
+                    wc.new_address(rs)
+                        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+                }
+                wc
+            }
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -648,11 +788,6 @@ impl ReadableWriteable<ChainType, ChainType> for WalletCapability {
                 ))
             }
         };
-        let receiver_selections = Vector::read(reader, |r| ReceiverSelection::read(r, ()))?;
-        for rs in receiver_selections {
-            wc.new_address(rs)
-                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        }
         Ok(wc)
     }
 

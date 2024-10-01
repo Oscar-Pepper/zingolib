@@ -213,6 +213,8 @@ async fn reload_wallet_from_buffer() {
     use crate::wallet::WalletBase;
     use crate::wallet::WalletCapability;
 
+    tracing_subscriber::fmt().init();
+
     let mid_wallet = Testnet(CBBHRWIILGBRABABSSHSMTPR(
         ExampleCBBHRWIILGBRABABSSHSMTPRVersion::V28,
     ))
