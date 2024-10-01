@@ -721,27 +721,40 @@ impl ReadableWriteable<ChainType, ChainType> for WalletCapability {
                     super::legacy::extended_transparent::ExtendedPrivKey,
                 >::read(&mut reader, ())?;
 
+                let mut viewing_key: bool = false;
+                let orchard_fvk = match orchard_capability {
+                    Capability::Spend(sk) => Some(orchard::keys::FullViewingKey::from(&sk)),
+                    Capability::View(fvk) => {
+                        viewing_key = true;
+                        Some(fvk)
+                    }
+                    Capability::None => None,
+                };
+                let sapling_fvk = match sapling_capability {
+                    Capability::Spend(sk) => Some(sk.to_diversifiable_full_viewing_key()),
+                    Capability::View(fvk) => {
+                        viewing_key = true;
+                        Some(fvk)
+                    }
+                    Capability::None => None,
+                };
+                let transparent_fvk = match transparent_capability {
+                    Capability::Spend(sk) => Some(
+                        super::legacy::extended_transparent::ExtendedPubKey::from(&sk),
+                    ),
+                    Capability::View(fvk) => {
+                        viewing_key = true;
+                        Some(fvk)
+                    }
+                    Capability::None => None,
+                };
+
                 // if this wallet was created from a UFVK, create the UFVK from FVKs.
                 // otherwise, set unified key store to None.
                 //
                 // USK is derived later from seed due to missing BIP0032 transparent extended private key data
                 // this missing data is not required for UFVKs
-                let orchard_fvk = match orchard_capability {
-                    Capability::View(fvk) => Some(fvk),
-                    _ => None,
-                };
-                let sapling_fvk = match sapling_capability {
-                    Capability::View(fvk) => Some(fvk),
-                    _ => None,
-                };
-                let transparent_fvk = match transparent_capability {
-                    Capability::View(fvk) => Some(fvk),
-                    _ => None,
-                };
-                let unified_key_store = if orchard_fvk.is_some()
-                    || sapling_fvk.is_some()
-                    || transparent_fvk.is_some()
-                {
+                let unified_key_store = if viewing_key {
                     let ufvk = super::legacy::legacy_fvks_to_ufvk(
                         orchard_fvk.as_ref(),
                         sapling_fvk.as_ref(),
