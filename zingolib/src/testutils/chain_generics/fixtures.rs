@@ -443,7 +443,6 @@ pub async fn shpool_to_pool_insufficient_error<CC>(
 }
 
 /// the simplest test that sends from a specific shielded pool to another specific pool. also known as simpool.
-#[cfg(not(feature = "sync"))]
 pub async fn to_pool_unfunded_error<CC>(pool: PoolType, try_amount: u64)
 where
     CC: ConductChain,
@@ -465,49 +464,7 @@ where
             &ref_secondary,
             vec![(
                 ref_tertiary
-                    .wallet
-                    .get_first_address(pool)
-                    .unwrap()
-                    .as_str(),
-                try_amount,
-                None,
-            )],
-        )
-        .await
-        .unwrap_err()
-        .to_string(),
-        format!(
-            "Insufficient balance (have {}, need {} including fee)",
-            0,
-            try_amount + expected_fee
-        )
-    );
-}
-/// the simplest test that sends from a specific shielded pool to another specific pool. also known as simpool.
-#[cfg(feature = "sync")]
-pub async fn to_pool_unfunded_error<CC>(pool: PoolType, try_amount: u64)
-where
-    CC: ConductChain,
-{
-    let mut environment = CC::setup().await;
-
-    let secondary = environment.create_client().await;
-    let tertiary = environment.create_client().await;
-
-    let ref_secondary: Arc<LightClient> = Arc::new(secondary);
-    let ref_tertiary: Arc<LightClient> = Arc::new(tertiary);
-
-    ref_secondary.do_sync(false).await.unwrap();
-
-    let expected_fee = fee_tables::one_to_one(None, pool, true);
-
-    assert_eq!(
-        from_inputs::propose(
-            &ref_secondary,
-            vec![(
-                ref_tertiary
-                    .wallet
-                    .lock()
+                    .wallet_mut()
                     .await
                     .get_first_address(pool)
                     .unwrap()
