@@ -509,9 +509,9 @@ impl LightClient {
     /// TODO: Add Doc Comment Here!
     pub async fn clear_state(&self) {
         #[cfg(not(feature = "sync"))]
-        let wallet = &self.wallet;
+        let wallet: &LightWallet = &self.wallet;
         #[cfg(feature = "sync")]
-        let wallet = self.wallet.lock().await;
+        let wallet: tokio::sync::MutexGuard<'_, LightWallet> = self.wallet.lock().await;
 
         // First, clear the state from the wallet
         wallet.clear_all().await;
