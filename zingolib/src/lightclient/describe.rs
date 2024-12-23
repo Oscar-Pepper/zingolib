@@ -944,14 +944,8 @@ impl LightClient {
     }
 
     /// TODO: Add Doc Comment Here!
-    #[cfg(not(feature = "sync"))]
     pub async fn do_wallet_last_scanned_height(&self) -> JsonValue {
-        json::JsonValue::from(self.wallet.last_synced_height().await)
-    }
-    /// TODO: Add Doc Comment Here!
-    #[cfg(feature = "sync")]
-    pub async fn do_wallet_last_scanned_height(&self) -> JsonValue {
-        json::JsonValue::from(self.wallet.lock().await.last_synced_height().await)
+        json::JsonValue::from(self.wallet_mut().await.last_synced_height().await)
     }
 
     /// TODO: Add Doc Comment Here!
