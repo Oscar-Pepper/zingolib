@@ -755,61 +755,9 @@ impl LightClient {
     pub async fn transaction_summaries_json_string(&self) -> String {
         json::JsonValue::from(self.transaction_summaries().await).pretty(2)
     }
-
     /// Provides a detailed list of transaction summaries related to this wallet in order of blockheight
-    #[cfg(not(feature = "sync"))]
     pub async fn detailed_transaction_summaries(&self) -> DetailedTransactionSummaries {
-        let transaction_map = self
-            .wallet
-            .transaction_context
-            .transaction_metadata_set
-            .read()
-            .await;
-        let transaction_records = &transaction_map.transaction_records_by_id;
-
-        let mut transaction_summaries = transaction_records
-            .values()
-            .map(|tx| {
-                let (kind, value, fee, orchard_notes, sapling_notes, transparent_coins) =
-                    basic_transaction_summary_parts(tx, transaction_records, &self.config().chain);
-                let orchard_nullifiers: Vec<String> = tx
-                    .spent_orchard_nullifiers
-                    .iter()
-                    .map(|nullifier| hex::encode(nullifier.to_bytes()))
-                    .collect();
-                let sapling_nullifiers: Vec<String> = tx
-                    .spent_sapling_nullifiers
-                    .iter()
-                    .map(hex::encode)
-                    .collect();
-
-                DetailedTransactionSummaryBuilder::new()
-                    .txid(tx.txid)
-                    .datetime(tx.datetime)
-                    .blockheight(tx.status.get_height())
-                    .kind(kind)
-                    .value(value)
-                    .fee(fee)
-                    .status(tx.status)
-                    .zec_price(tx.price)
-                    .orchard_notes(orchard_notes)
-                    .sapling_notes(sapling_notes)
-                    .transparent_coins(transparent_coins)
-                    .outgoing_tx_data(tx.outgoing_tx_data.clone())
-                    .orchard_nullifiers(orchard_nullifiers)
-                    .sapling_nullifiers(sapling_nullifiers)
-                    .build()
-                    .expect("all fields should be populated")
-            })
-            .collect::<Vec<_>>();
-        transaction_summaries.sort_by_key(|tx| tx.blockheight());
-
-        DetailedTransactionSummaries::new(transaction_summaries)
-    }
-    /// Provides a detailed list of transaction summaries related to this wallet in order of blockheight
-    #[cfg(feature = "sync")]
-    pub async fn detailed_transaction_summaries(&self) -> DetailedTransactionSummaries {
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
         let transaction_map = wallet
             .transaction_context
             .transaction_metadata_set
@@ -853,6 +801,7 @@ impl LightClient {
             })
             .collect::<Vec<_>>();
         drop(transaction_map);
+        #[cfg(feature = "sync")]
         drop(wallet);
 
         transaction_summaries.sort_by_key(|tx| tx.blockheight());
