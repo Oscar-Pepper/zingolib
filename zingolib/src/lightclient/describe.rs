@@ -866,21 +866,8 @@ impl LightClient {
     }
 
     /// TODO: Add Doc Comment Here!
-    #[cfg(not(feature = "sync"))]
     pub async fn do_seed_phrase(&self) -> Result<AccountBackupInfo, &str> {
-        match self.wallet.mnemonic() {
-            Some(m) => Ok(AccountBackupInfo {
-                seed_phrase: m.0.phrase().to_string(),
-                birthday: self.wallet.get_birthday().await,
-                account_index: m.1,
-            }),
-            None => Err("This wallet is watch-only or was created without a mnemonic."),
-        }
-    }
-    /// TODO: Add Doc Comment Here!
-    #[cfg(feature = "sync")]
-    pub async fn do_seed_phrase(&self) -> Result<AccountBackupInfo, &str> {
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
         match wallet.mnemonic() {
             Some(m) => Ok(AccountBackupInfo {
                 seed_phrase: m.0.phrase().to_string(),
