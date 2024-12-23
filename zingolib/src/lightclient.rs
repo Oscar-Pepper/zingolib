@@ -1,7 +1,7 @@
 //! TODO: Add Mod Description Here!
 
 use json::{array, object, JsonValue};
-use log::{debug, error};
+use log::error;
 use serde::Serialize;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
