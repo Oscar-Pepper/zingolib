@@ -42,21 +42,8 @@ fn some_sum(a: Option<u64>, b: Option<u64>) -> Option<u64> {
 }
 impl LightClient {
     /// Uses a query to select all notes across all transactions with specific properties and sum them
-    #[cfg(not(feature = "sync"))]
     pub async fn query_sum_value(&self, include_notes: OutputQuery) -> u64 {
-        self.wallet
-            .transaction_context
-            .transaction_metadata_set
-            .read()
-            .await
-            .transaction_records_by_id
-            .query_sum_value(include_notes)
-    }
-    /// Uses a query to select all notes across all transactions with specific properties and sum them
-    #[cfg(feature = "sync")]
-    pub async fn query_sum_value(&self, include_notes: OutputQuery) -> u64 {
-        self.wallet
-            .lock()
+        self.wallet_mut()
             .await
             .transaction_context
             .transaction_metadata_set
