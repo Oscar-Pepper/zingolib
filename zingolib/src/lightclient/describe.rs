@@ -68,33 +68,10 @@ impl LightClient {
 
     /// TODO: Add Doc Comment Here!
     // todo use helpers
-    #[cfg(not(feature = "sync"))]
-    pub async fn do_addresses(&self) -> JsonValue {
-        let mut objectified_addresses = Vec::new();
-        for address in self.wallet.wallet_capability().addresses().iter() {
-            let encoded_ua = address.encode(&self.config.chain);
-            let transparent = address
-                .transparent()
-                .map(|taddr| address_from_pubkeyhash(&self.config, *taddr));
-            objectified_addresses.push(object! {
-        "address" => encoded_ua,
-        "receivers" => object!(
-            "transparent" => transparent,
-            "sapling" => address.sapling().map(|z_addr| encode_payment_address(self.config.chain.hrp_sapling_payment_address(), z_addr)),
-            "orchard_exists" => address.orchard().is_some(),
-            )
-        })
-        }
-        JsonValue::Array(objectified_addresses)
-    }
-    /// TODO: Add Doc Comment Here!
-    // todo use helpers
-    #[cfg(feature = "sync")]
     pub async fn do_addresses(&self) -> JsonValue {
         let mut objectified_addresses = Vec::new();
         for address in self
-            .wallet
-            .lock()
+            .wallet_mut()
             .await
             .wallet_capability()
             .addresses()
@@ -118,36 +95,8 @@ impl LightClient {
 
     /// TODO: Redefine the wallet balance functions as non-generics that take a
     /// PoolType variant as an argument, and iterate over a `Vec<Output>`
-    #[cfg(not(feature = "sync"))]
     pub async fn do_balance(&self) -> PoolBalances {
-        let verified_sapling_balance = self.wallet.confirmed_balance::<SaplingDomain>().await;
-        let unverified_sapling_balance = self.wallet.pending_balance::<SaplingDomain>().await;
-        let spendable_sapling_balance = self.wallet.spendable_balance::<SaplingDomain>().await;
-        let sapling_balance = some_sum(verified_sapling_balance, unverified_sapling_balance);
-
-        let verified_orchard_balance = self.wallet.confirmed_balance::<OrchardDomain>().await;
-        let unverified_orchard_balance = self.wallet.pending_balance::<OrchardDomain>().await;
-        let spendable_orchard_balance = self.wallet.spendable_balance::<OrchardDomain>().await;
-        let orchard_balance = some_sum(verified_orchard_balance, unverified_orchard_balance);
-        PoolBalances {
-            sapling_balance,
-            verified_sapling_balance,
-            spendable_sapling_balance,
-            unverified_sapling_balance,
-
-            orchard_balance,
-            verified_orchard_balance,
-            spendable_orchard_balance,
-            unverified_orchard_balance,
-
-            transparent_balance: self.wallet.get_transparent_balance().await,
-        }
-    }
-    /// TODO: Redefine the wallet balance functions as non-generics that take a
-    /// PoolType variant as an argument, and iterate over a `Vec<Output>`
-    #[cfg(feature = "sync")]
-    pub async fn do_balance(&self) -> PoolBalances {
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
         let verified_sapling_balance = wallet.confirmed_balance::<SaplingDomain>().await;
         let unverified_sapling_balance = wallet.pending_balance::<SaplingDomain>().await;
         let spendable_sapling_balance = wallet.spendable_balance::<SaplingDomain>().await;
