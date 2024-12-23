@@ -1,6 +1,8 @@
 //! TODO: Add Mod Description Here!
 
 use json::{array, object, JsonValue};
+#[cfg(not(feature = "sync"))]
+use log::debug;
 use log::error;
 use serde::Serialize;
 use std::sync::Arc;
