@@ -585,9 +585,8 @@ impl LightClient {
     }
 
     /// Create a new address, deriving it from the seed.
-    #[cfg(not(feature = "sync"))]
+    //TODO: Placeholder interface
     pub async fn do_new_address(&self, addr_type: &str) -> Result<JsonValue, String> {
-        //TODO: Placeholder interface
         let desired_receivers = ReceiverSelection {
             sapling: addr_type.contains('z'),
             orchard: addr_type.contains('o'),
@@ -595,26 +594,7 @@ impl LightClient {
         };
 
         let new_address = self
-            .wallet
-            .wallet_capability()
-            .new_address(desired_receivers, false)?;
-
-        // self.save_internal_rust().await?;
-
-        Ok(array![new_address.encode(&self.config.chain)])
-    }
-    #[cfg(feature = "sync")]
-    pub async fn do_new_address(&self, addr_type: &str) -> Result<JsonValue, String> {
-        //TODO: Placeholder interface
-        let desired_receivers = ReceiverSelection {
-            sapling: addr_type.contains('z'),
-            orchard: addr_type.contains('o'),
-            transparent: addr_type.contains('t'),
-        };
-
-        let new_address = self
-            .wallet
-            .lock()
+            .wallet_mut()
             .await
             .wallet_capability()
             .new_address(desired_receivers, false)?;
@@ -644,26 +624,11 @@ impl LightClient {
         }
     }
 
-    #[cfg(not(feature = "sync"))]
     pub(crate) async fn update_current_price(&self) -> String {
         // Get the zec price from the server
         match get_recent_median_price_from_gemini().await {
             Ok(price) => {
-                self.wallet.set_latest_zec_price(price).await;
-                price.to_string()
-            }
-            Err(s) => {
-                error!("Error fetching latest price: {}", s);
-                s.to_string()
-            }
-        }
-    }
-    #[cfg(feature = "sync")]
-    pub(crate) async fn update_current_price(&self) -> String {
-        // Get the zec price from the server
-        match get_recent_median_price_from_gemini().await {
-            Ok(price) => {
-                self.wallet.lock().await.set_latest_zec_price(price).await;
+                self.wallet_mut().await.set_latest_zec_price(price).await;
                 price.to_string()
             }
             Err(s) => {
