@@ -276,24 +276,10 @@ mod shielding {
         .unwrap()
     }
     #[tokio::test]
-    #[cfg(not(feature = "sync"))]
-    async fn propose_shield_missing_scan_prerequisite() {
-        let basic_client = create_basic_client().await;
-        let propose_shield_result = basic_client.wallet.create_shield_proposal().await;
-        match propose_shield_result {
-            Err(ProposeShieldError::Component(
-                zcash_client_backend::data_api::error::Error::ScanRequired,
-            )) => true,
-            _ => panic!("Unexpected error state!"),
-        };
-    }
-    #[tokio::test]
-    #[cfg(feature = "sync")]
     async fn propose_shield_missing_scan_prerequisite() {
         let basic_client = create_basic_client().await;
         let propose_shield_result = basic_client
-            .wallet
-            .lock()
+            .wallet_mut()
             .await
             .create_shield_proposal()
             .await;
@@ -305,25 +291,10 @@ mod shielding {
         };
     }
     #[tokio::test]
-    #[cfg(not(feature = "sync"))]
     async fn get_transparent_addresses() {
         let basic_client = create_basic_client().await;
         assert_eq!(
-            basic_client.wallet.get_transparent_addresses(),
-            [zcash_primitives::legacy::TransparentAddress::PublicKeyHash(
-                [
-                    161, 138, 222, 242, 254, 121, 71, 105, 93, 131, 177, 31, 59, 185, 120, 148,
-                    255, 189, 198, 33
-                ]
-            )]
-        );
-    }
-    #[tokio::test]
-    #[cfg(feature = "sync")]
-    async fn get_transparent_addresses() {
-        let basic_client = create_basic_client().await;
-        assert_eq!(
-            basic_client.wallet.lock().await.get_transparent_addresses(),
+            basic_client.wallet_mut().await.get_transparent_addresses(),
             [zcash_primitives::legacy::TransparentAddress::PublicKeyHash(
                 [
                     161, 138, 222, 242, 254, 121, 71, 105, 93, 131, 177, 31, 59, 185, 120, 148,
