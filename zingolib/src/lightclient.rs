@@ -526,8 +526,6 @@ impl LightClient {
 
         // Then set the initial block
         let birthday = wallet.get_birthday().await;
-        #[cfg(not(feature = "sync"))]
-        self.set_wallet_initial_state(birthday).await;
         debug!("Cleared wallet state, with birthday at {}", birthday);
     }
 
