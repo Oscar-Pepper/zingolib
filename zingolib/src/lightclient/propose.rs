@@ -132,67 +132,12 @@ impl LightClient {
     ///
     /// Will return an error if this method fails to calculate the total wallet balance or create the
     /// proposal needed to calculate the fee
-    // TODO: move spendable balance and create proposal to wallet layer
-    #[cfg(not(feature = "sync"))]
     pub async fn get_spendable_shielded_balance(
         &self,
         address: ZcashAddress,
         zennies_for_zingo: bool,
     ) -> Result<NonNegativeAmount, ProposeSendError> {
-        let confirmed_shielded_balance = self
-            .wallet
-            .confirmed_shielded_balance_excluding_dust()
-            .await?;
-        let mut receivers = vec![Receiver::new(
-            address.clone(),
-            confirmed_shielded_balance,
-            None,
-        )];
-        if zennies_for_zingo {
-            self.append_zingo_zenny_receiver(&mut receivers);
-        }
-        let request = transaction_request_from_receivers(receivers)?;
-        let failing_proposal = self.wallet.create_send_proposal(request).await;
-
-        let shortfall = match failing_proposal {
-            Err(ProposeSendError::Proposal(
-                zcash_client_backend::data_api::error::Error::InsufficientFunds {
-                    available,
-                    required,
-                },
-            )) => {
-                if let Some(shortfall) = required - confirmed_shielded_balance {
-                    Ok(shortfall)
-                } else {
-                    // bugged underflow case, required should always be larger than available balance to cause
-                    // insufficient funds error. would suggest discrepancy between `available` and `confirmed_shielded_balance`
-                    // returns insufficient funds error with same values from original error for debugging
-                    Err(ProposeSendError::Proposal(
-                        zcash_client_backend::data_api::error::Error::InsufficientFunds {
-                            available,
-                            required,
-                        },
-                    ))
-                }
-            }
-            Err(e) => Err(e),
-            Ok(_) => Ok(NonNegativeAmount::ZERO), // in the case there is zero fee and the proposal is successful
-        }?;
-
-        (confirmed_shielded_balance - shortfall).ok_or(ProposeSendError::Proposal(
-            zcash_client_backend::data_api::error::Error::InsufficientFunds {
-                available: confirmed_shielded_balance,
-                required: shortfall,
-            },
-        ))
-    }
-    #[cfg(feature = "sync")]
-    pub async fn get_spendable_shielded_balance(
-        &self,
-        address: ZcashAddress,
-        zennies_for_zingo: bool,
-    ) -> Result<NonNegativeAmount, ProposeSendError> {
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
         let confirmed_shielded_balance = wallet.confirmed_shielded_balance_excluding_dust().await?;
         let mut receivers = vec![Receiver::new(
             address.clone(),
@@ -204,7 +149,6 @@ impl LightClient {
         }
         let request = transaction_request_from_receivers(receivers)?;
         let failing_proposal = wallet.create_send_proposal(request).await;
-        drop(wallet);
 
         let shortfall = match failing_proposal {
             Err(ProposeSendError::Proposal(
@@ -239,21 +183,10 @@ impl LightClient {
         ))
     }
 
-    /// Creates and stores a proposal for shielding all transparent funds..
-    #[cfg(not(feature = "sync"))]
     pub async fn propose_shield(
         &self,
     ) -> Result<ProportionalFeeShieldProposal, ProposeShieldError> {
-        let proposal = self.wallet.create_shield_proposal().await?;
-        self.store_proposal(ZingoProposal::Shield(proposal.clone()))
-            .await;
-        Ok(proposal)
-    }
-    #[cfg(feature = "sync")]
-    pub async fn propose_shield(
-        &self,
-    ) -> Result<ProportionalFeeShieldProposal, ProposeShieldError> {
-        let proposal = self.wallet.lock().await.create_shield_proposal().await?;
+        let proposal = self.wallet_mut().await.create_shield_proposal().await?;
         self.store_proposal(ZingoProposal::Shield(proposal.clone()))
             .await;
         Ok(proposal)
