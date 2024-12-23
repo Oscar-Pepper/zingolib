@@ -541,7 +541,6 @@ impl LightClient {
     }
 
     /// TODO: Add Doc Comment Here!
-    #[cfg(not(feature = "sync"))]
     pub async fn do_decrypt_message(&self, enc_base64: String) -> JsonValue {
         let data = match base64::decode(enc_base64) {
             Ok(v) => v,
@@ -550,28 +549,7 @@ impl LightClient {
             }
         };
 
-        match self.wallet.decrypt_message(data).await {
-            Ok(m) => {
-                let memo_bytes: MemoBytes = m.memo.clone().into();
-                object! {
-                    "to" => encode_payment_address(self.config.chain.hrp_sapling_payment_address(), &m.to),
-                    "memo" => LightWallet::memo_str(Some(m.memo)),
-                    "memohex" => hex::encode(memo_bytes.as_slice())
-                }
-            }
-            Err(_) => object! { "error" => "Couldn't decrypt with any of the wallet's keys"},
-        }
-    }
-    #[cfg(feature = "sync")]
-    pub async fn do_decrypt_message(&self, enc_base64: String) -> JsonValue {
-        let data = match base64::decode(enc_base64) {
-            Ok(v) => v,
-            Err(e) => {
-                return object! {"error" => format!("Couldn't decode base64. Error was {}", e)}
-            }
-        };
-
-        match self.wallet.lock().await.decrypt_message(data).await {
+        match self.wallet_mut().await.decrypt_message(data).await {
             Ok(m) => {
                 let memo_bytes: MemoBytes = m.memo.clone().into();
                 object! {
