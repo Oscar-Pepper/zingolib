@@ -505,24 +505,9 @@ pub mod propose;
 // other functions
 impl LightClient {
     /// TODO: Add Doc Comment Here!
-    #[cfg(not(feature = "sync"))]
     pub async fn clear_state(&self) {
         #[cfg(not(feature = "sync"))]
         let wallet = &self.wallet;
-
-        // First, clear the state from the wallet
-        wallet.clear_all().await;
-
-        // Then set the initial block
-        let birthday = wallet.get_birthday().await;
-
-        #[cfg(not(feature = "sync"))]
-        self.set_wallet_initial_state(birthday).await;
-
-        debug!("Cleared wallet state, with birthday at {}", birthday);
-    }
-    #[cfg(feature = "sync")]
-    pub async fn clear_state(&self) {
         #[cfg(feature = "sync")]
         let wallet = self.wallet.lock().await;
 
@@ -530,9 +515,12 @@ impl LightClient {
         wallet.clear_all().await;
 
         // Then set the initial block
-        let birthday = wallet.get_birthday().await;
+        #[cfg(not(feature = "sync"))]
+        {
+            let birthday = wallet.get_birthday().await;
 
-        debug!("Cleared wallet state, with birthday at {}", birthday);
+            self.set_wallet_initial_state(birthday).await;
+        }
     }
 
     /// TODO: Add Doc Comment Here!
