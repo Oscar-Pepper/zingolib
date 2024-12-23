@@ -1055,7 +1055,6 @@ impl LightClient {
         )
     }
 
-    #[cfg(not(feature = "sync"))]
     async fn list_orchard_notes(
         &self,
         all_notes: bool,
@@ -1063,49 +1062,7 @@ impl LightClient {
         let mut unspent_orchard_notes: Vec<JsonValue> = vec![];
         let mut pending_spent_orchard_notes: Vec<JsonValue> = vec![];
         let mut spent_orchard_notes: Vec<JsonValue> = vec![];
-        self.wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
-            .flat_map( |(transaction_id, transaction_metadata)| {
-                transaction_metadata.orchard_notes.iter().filter_map(move |note_metadata|
-                    if !all_notes && note_metadata.is_spent_confirmed() {
-                        None
-                    } else {
-                        let address = LightWallet::note_address::<OrchardDomain>(&self.config.chain, note_metadata, &self.wallet.wallet_capability());
-                        let spendable = transaction_metadata.status.is_confirmed() && note_metadata.spending_tx_status().is_none();
-
-                        let created_block:u32 = transaction_metadata.status.get_height().into();
-                        Some(object!{
-                            "created_in_block"   => created_block,
-                            "datetime"           => transaction_metadata.datetime,
-                            "created_in_txid"    => format!("{}", transaction_id),
-                            "value"              => note_metadata.orchard_crypto_note.value().inner(),
-                            "pending"        => !transaction_metadata.status.is_confirmed(),
-                            "address"            => address,
-                            "spendable"          => spendable,
-                            "spent"    => note_metadata.spending_tx_status().and_then(|(s_txid, status)| {if status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "pending_spent"    => note_metadata.spending_tx_status().and_then(|(s_txid, status)| {if !status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "spent_at_height"    => note_metadata.spending_tx_status().map(|(_, status)| u32::from(status.get_height())),
-                        })
-                    }
-                )
-            })
-            .for_each( |note| {
-                self.unspent_pending_spent(note, &mut unspent_orchard_notes, &mut pending_spent_orchard_notes, &mut spent_orchard_notes)
-            });
-        (
-            unspent_orchard_notes,
-            spent_orchard_notes,
-            pending_spent_orchard_notes,
-        )
-    }
-    #[cfg(feature = "sync")]
-    async fn list_orchard_notes(
-        &self,
-        all_notes: bool,
-    ) -> (Vec<JsonValue>, Vec<JsonValue>, Vec<JsonValue>) {
-        let mut unspent_orchard_notes: Vec<JsonValue> = vec![];
-        let mut pending_spent_orchard_notes: Vec<JsonValue> = vec![];
-        let mut spent_orchard_notes: Vec<JsonValue> = vec![];
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
 
         wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
             .flat_map( |(transaction_id, transaction_metadata)| {
