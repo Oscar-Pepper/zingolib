@@ -640,63 +640,8 @@ impl LightClient {
     }
 
     /// Provides a list of transaction summaries related to this wallet in order of blockheight
-    #[cfg(not(feature = "sync"))]
     pub async fn transaction_summaries(&self) -> TransactionSummaries {
-        let transaction_map = self
-            .wallet
-            .transaction_context
-            .transaction_metadata_set
-            .read()
-            .await;
-        let transaction_records = &transaction_map.transaction_records_by_id;
-
-        let mut transaction_summaries = transaction_records
-            .values()
-            .map(|tx| {
-                let (kind, value, fee, orchard_notes, sapling_notes, transparent_coins) =
-                    basic_transaction_summary_parts(tx, transaction_records, &self.config().chain);
-
-                TransactionSummaryBuilder::new()
-                    .txid(tx.txid)
-                    .datetime(tx.datetime)
-                    .blockheight(tx.status.get_height())
-                    .kind(kind)
-                    .value(value)
-                    .fee(fee)
-                    .status(tx.status)
-                    .zec_price(tx.price)
-                    .orchard_notes(orchard_notes)
-                    .sapling_notes(sapling_notes)
-                    .transparent_coins(transparent_coins)
-                    .outgoing_tx_data(tx.outgoing_tx_data.clone())
-                    .build()
-                    .expect("all fields should be populated")
-            })
-            .collect::<Vec<_>>();
-        transaction_summaries.sort_by(|sum1, sum2| {
-            match sum1.blockheight().cmp(&sum2.blockheight()) {
-                Ordering::Equal => {
-                    let starts_with_tex = |summary: &TransactionSummary| {
-                        summary.outgoing_tx_data().iter().any(|outgoing_txdata| {
-                            outgoing_txdata.recipient_address.starts_with("tex")
-                        })
-                    };
-                    match (starts_with_tex(sum1), starts_with_tex(sum2)) {
-                        (true, false) => Ordering::Greater,
-                        (false, true) => Ordering::Less,
-                        (false, false) | (true, true) => Ordering::Equal,
-                    }
-                }
-                otherwise => otherwise,
-            }
-        });
-
-        TransactionSummaries::new(transaction_summaries)
-    }
-    /// Provides a list of transaction summaries related to this wallet in order of blockheight
-    #[cfg(feature = "sync")]
-    pub async fn transaction_summaries(&self) -> TransactionSummaries {
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
         let transaction_map = wallet
             .transaction_context
             .transaction_metadata_set
@@ -728,6 +673,7 @@ impl LightClient {
             })
             .collect::<Vec<_>>();
         drop(transaction_map);
+        #[cfg(feature = "sync")]
         drop(wallet);
 
         transaction_summaries.sort_by(|sum1, sum2| {
