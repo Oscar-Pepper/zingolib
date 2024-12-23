@@ -40,25 +40,12 @@ impl LightClient {
         *latest_proposal_lock = Some(proposal);
     }
     /// Creates and stores a proposal from a transaction request.
-    #[cfg(not(feature = "sync"))]
-    pub async fn propose_send(
-        &self,
-        request: TransactionRequest,
-    ) -> Result<ProportionalFeeProposal, crate::wallet::propose::ProposeSendError> {
-        let proposal = self.wallet.create_send_proposal(request).await?;
-        self.store_proposal(ZingoProposal::Transfer(proposal.clone()))
-            .await;
-        Ok(proposal)
-    }
-    /// Creates and stores a proposal from a transaction request.
-    #[cfg(feature = "sync")]
     pub async fn propose_send(
         &self,
         request: TransactionRequest,
     ) -> Result<ProportionalFeeProposal, crate::wallet::propose::ProposeSendError> {
         let proposal = self
-            .wallet
-            .lock()
+            .wallet_mut()
             .await
             .create_send_proposal(request)
             .await?;
@@ -66,34 +53,7 @@ impl LightClient {
             .await;
         Ok(proposal)
     }
-
     /// Creates and stores a proposal for sending all shielded funds to a given address.
-    #[cfg(not(feature = "sync"))]
-    pub async fn propose_send_all(
-        &self,
-        address: ZcashAddress,
-        zennies_for_zingo: bool,
-        memo: Option<zcash_primitives::memo::MemoBytes>,
-    ) -> Result<ProportionalFeeProposal, ProposeSendError> {
-        let spendable_balance = self
-            .get_spendable_shielded_balance(address.clone(), zennies_for_zingo)
-            .await?;
-        if spendable_balance == NonNegativeAmount::ZERO {
-            return Err(ProposeSendError::ZeroValueSendAll);
-        }
-        let mut receivers = vec![Receiver::new(address, spendable_balance, memo)];
-        if zennies_for_zingo {
-            self.append_zingo_zenny_receiver(&mut receivers);
-        }
-        let request = transaction_request_from_receivers(receivers)
-            .map_err(ProposeSendError::TransactionRequestFailed)?;
-        let proposal = self.wallet.create_send_proposal(request).await?;
-        self.store_proposal(ZingoProposal::Transfer(proposal.clone()))
-            .await;
-        Ok(proposal)
-    }
-    /// Creates and stores a proposal for sending all shielded funds to a given address.
-    #[cfg(feature = "sync")]
     pub async fn propose_send_all(
         &self,
         address: ZcashAddress,
@@ -113,8 +73,7 @@ impl LightClient {
         let request = transaction_request_from_receivers(receivers)
             .map_err(ProposeSendError::TransactionRequestFailed)?;
         let proposal = self
-            .wallet
-            .lock()
+            .wallet_mut()
             .await
             .create_send_proposal(request)
             .await?;
