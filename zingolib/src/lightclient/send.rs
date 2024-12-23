@@ -722,7 +722,6 @@ pub mod send_with_proposal {
             /// requires 1 confirmation: expect 3 minute runtime
             #[tokio::test]
             #[ignore = "dont automatically run hot tests! this test spends actual zec!"]
-            #[cfg(not(feature = "sync"))]
             async fn mainnet_send_to_self_orchard() {
                 let case = examples::NetworkSeedVersion::Mainnet(
                     examples::MainnetSeedVersion::HotelHumor(examples::HotelHumorVersion::Latest),
@@ -734,40 +733,7 @@ pub mod send_with_proposal {
                 println!(
                     "mainnet_hhcclaltpcckcsslpcnetblr has {} transactions in it",
                     client
-                        .wallet
-                        .transaction_context
-                        .transaction_metadata_set
-                        .read()
-                        .await
-                        .transaction_records_by_id
-                        .len()
-                );
-
-                with_assertions::propose_send_bump_sync_all_recipients(
-                    &mut LiveChain::setup().await,
-                    &client,
-                    vec![(&client, target_pool, 10_000, None)],
-                    false,
-                )
-                .await
-                .unwrap();
-            }
-            #[tokio::test]
-            #[ignore = "dont automatically run hot tests! this test spends actual zec!"]
-            #[cfg(feature = "sync")]
-            async fn mainnet_send_to_self_orchard() {
-                let case = examples::NetworkSeedVersion::Mainnet(
-                    examples::MainnetSeedVersion::HotelHumor(examples::HotelHumorVersion::Latest),
-                );
-                let target_pool = PoolType::Shielded(ShieldedProtocol::Orchard);
-
-                let client = sync_example_wallet(case).await;
-
-                println!(
-                    "mainnet_hhcclaltpcckcsslpcnetblr has {} transactions in it",
-                    client
-                        .wallet
-                        .lock()
+                        .wallet_mut()
                         .await
                         .transaction_context
                         .transaction_metadata_set
@@ -790,7 +756,6 @@ pub mod send_with_proposal {
             /// requires 1 confirmation: expect 3 minute runtime
             #[tokio::test]
             #[ignore = "dont automatically run hot tests! this test spends actual zec!"]
-            #[cfg(not(feature = "sync"))]
             async fn mainnet_send_to_self_sapling() {
                 let case = examples::NetworkSeedVersion::Mainnet(
                     examples::MainnetSeedVersion::HotelHumor(examples::HotelHumorVersion::Latest),
@@ -802,40 +767,7 @@ pub mod send_with_proposal {
                 println!(
                     "mainnet_hhcclaltpcckcsslpcnetblr has {} transactions in it",
                     client
-                        .wallet
-                        .transaction_context
-                        .transaction_metadata_set
-                        .read()
-                        .await
-                        .transaction_records_by_id
-                        .len()
-                );
-
-                with_assertions::propose_send_bump_sync_all_recipients(
-                    &mut LiveChain::setup().await,
-                    &client,
-                    vec![(&client, target_pool, 400_000, None)],
-                    false,
-                )
-                .await
-                .unwrap();
-            }
-            #[tokio::test]
-            #[ignore = "dont automatically run hot tests! this test spends actual zec!"]
-            #[cfg(feature = "sync")]
-            async fn mainnet_send_to_self_sapling() {
-                let case = examples::NetworkSeedVersion::Mainnet(
-                    examples::MainnetSeedVersion::HotelHumor(examples::HotelHumorVersion::Latest),
-                );
-                let target_pool = PoolType::Shielded(ShieldedProtocol::Sapling);
-
-                let client = sync_example_wallet(case).await;
-
-                println!(
-                    "mainnet_hhcclaltpcckcsslpcnetblr has {} transactions in it",
-                    client
-                        .wallet
-                        .lock()
+                        .wallet_mut()
                         .await
                         .transaction_context
                         .transaction_metadata_set
