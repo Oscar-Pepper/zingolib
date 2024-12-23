@@ -487,41 +487,11 @@ pub mod send_with_proposal {
             Ok(txids)
         }
 
-        #[cfg(not(feature = "sync"))]
         async fn complete_and_broadcast<NoteRef>(
             &self,
             proposal: &Proposal<zcash_primitives::transaction::fees::zip317::FeeRule, NoteRef>,
         ) -> Result<NonEmpty<TxId>, CompleteAndBroadcastError> {
-            self.wallet.create_transaction(proposal).await?;
-
-            self.record_created_transactions().await?;
-
-            let broadcast_result = self.broadcast_created_transactions().await;
-
-            self.wallet
-                .set_send_result(broadcast_result.clone().map_err(|e| e.to_string()).map(
-                    |vec_txids| {
-                        serde_json::Value::Array(
-                            vec_txids
-                                .iter()
-                                .map(|txid| serde_json::Value::String(txid.to_string()))
-                                .collect::<Vec<serde_json::Value>>(),
-                        )
-                    },
-                ))
-                .await;
-
-            let broadcast_txids = NonEmpty::from_vec(broadcast_result?)
-                .ok_or(CompleteAndBroadcastError::EmptyList)?;
-
-            Ok(broadcast_txids)
-        }
-        #[cfg(feature = "sync")]
-        async fn complete_and_broadcast<NoteRef>(
-            &self,
-            proposal: &Proposal<zcash_primitives::transaction::fees::zip317::FeeRule, NoteRef>,
-        ) -> Result<NonEmpty<TxId>, CompleteAndBroadcastError> {
-            let wallet = self.wallet.lock().await;
+            let wallet = self.wallet_mut().await;
             wallet.create_transaction(proposal).await?;
 
             self.record_created_transactions().await?;
