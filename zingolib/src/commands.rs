@@ -126,16 +126,10 @@ impl Command for GetBirthdayCommand {
         "Get wallet birthday."
     }
 
-    #[cfg(not(feature = "sync"))]
-    fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
-        RT.block_on(async move { lightclient.wallet.get_birthday().await.to_string() })
-    }
-    #[cfg(feature = "sync")]
     fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
         RT.block_on(async move {
             lightclient
-                .wallet
-                .lock()
+                .wallet_mut()
                 .await
                 .get_birthday()
                 .await
@@ -158,44 +152,6 @@ impl Command for WalletKindCommand {
         "Displays the kind of wallet currently loaded"
     }
 
-    #[cfg(not(feature = "sync"))]
-    fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
-        RT.block_on(async move {
-            if lightclient.do_seed_phrase().await.is_ok() {
-                object! {"kind" => "Loaded from seed phrase",
-                        "transparent" => true,
-                        "sapling" => true,
-                        "orchard" => true,
-                }
-                .pretty(4)
-            } else {
-                match &lightclient.wallet.wallet_capability().unified_key_store {
-                    UnifiedKeyStore::Spend(_) => object! {
-                        "kind" => "Loaded from unified spending key",
-                        "transparent" => true,
-                        "sapling" => true,
-                        "orchard" => true,
-                    }
-                    .pretty(4),
-                    UnifiedKeyStore::View(ufvk) => object! {
-                        "kind" => "Loaded from unified full viewing key",
-                        "transparent" => ufvk.transparent().is_some(),
-                        "sapling" => ufvk.sapling().is_some(),
-                        "orchard" => ufvk.orchard().is_some(),
-                    }
-                    .pretty(4),
-                    UnifiedKeyStore::Empty => object! {
-                        "kind" => "No keys found",
-                        "transparent" => false,
-                        "sapling" => false,
-                        "orchard" => false,
-                    }
-                    .pretty(4),
-                }
-            }
-        })
-    }
-    #[cfg(feature = "sync")]
     fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
         RT.block_on(async move {
             if lightclient.do_seed_phrase().await.is_ok() {
@@ -207,8 +163,7 @@ impl Command for WalletKindCommand {
                 .pretty(4)
             } else {
                 match &lightclient
-                    .wallet
-                    .lock()
+                    .wallet_mut()
                     .await
                     .wallet_capability()
                     .unified_key_store
@@ -463,9 +418,15 @@ impl Command for SyncStatusCommand {
         "Get the sync status of the wallet"
     }
 
-    #[cfg(not(feature = "sync"))]
     fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
-        RT.block_on(async move {
+        #[cfg(feature = "sync")]
+        todo!(
+            "todo sync status / use variable {:?}",
+            lightclient.config().lightwalletd_uri
+        );
+        #[cfg(not(feature = "sync"))]
+        {
+            RT.block_on(async move {
             let status = lightclient.do_sync_status().await;
 
             let o = if status.in_progress {
@@ -494,10 +455,7 @@ impl Command for SyncStatusCommand {
             };
             o.pretty(2)
         })
-    }
-    #[cfg(feature = "sync")]
-    fn exec(&self, _args: &[&str], _lightclient: &LightClient) -> String {
-        todo!()
+        }
     }
 }
 
@@ -542,18 +500,17 @@ impl Command for RescanCommand {
         "Rescan the wallet, downloading and scanning all blocks and transactions"
     }
 
-    #[cfg(not(feature = "sync"))]
     fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
-        RT.block_on(async move {
-            match lightclient.do_rescan().await {
-                Ok(j) => j.to_json().pretty(2),
-                Err(e) => e,
-            }
-        })
-    }
-    #[cfg(feature = "sync")]
-    fn exec(&self, _args: &[&str], _lightclient: &LightClient) -> String {
-        todo!()
+        if cfg!(feature = "sync") {
+            todo!()
+        } else {
+            RT.block_on(async move {
+                match lightclient.do_rescan().await {
+                    Ok(j) => j.to_json().pretty(2),
+                    Err(e) => e,
+                }
+            })
+        }
     }
 }
 
@@ -825,25 +782,10 @@ impl Command for ExportUfvkCommand {
         "Export full viewing key for wallet addresses"
     }
 
-    #[cfg(not(feature = "sync"))]
-    fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
-        let ufvk: UnifiedFullViewingKey =
-            match (&lightclient.wallet.wallet_capability().unified_key_store).try_into() {
-                Ok(ufvk) => ufvk,
-                Err(e) => return e.to_string(),
-            };
-        object! {
-            "ufvk" => ufvk.encode(&lightclient.config().chain),
-            "birthday" => RT.block_on(lightclient.wallet.get_birthday())
-        }
-        .pretty(2)
-    }
-    #[cfg(feature = "sync")]
     fn exec(&self, _args: &[&str], lightclient: &LightClient) -> String {
         RT.block_on(async move {
             let ufvk: UnifiedFullViewingKey = match (&lightclient
-                .wallet
-                .lock()
+                .wallet_mut()
                 .await
                 .wallet_capability()
                 .unified_key_store)
@@ -854,7 +796,7 @@ impl Command for ExportUfvkCommand {
             };
             object! {
                 "ufvk" => ufvk.encode(&lightclient.config().chain),
-                "birthday" => lightclient.wallet.lock().await.get_birthday().await
+                "birthday" => lightclient.wallet_mut().await.get_birthday().await
             }
             .pretty(2)
         })
