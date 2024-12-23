@@ -963,8 +963,6 @@ impl LightClient {
     pub fn get_server_uri(&self) -> http::Uri {
         self.config.get_lightwalletd_uri()
     }
-
-    #[cfg(not(feature = "sync"))]
     async fn list_sapling_notes(
         &self,
         all_notes: bool,
@@ -972,51 +970,7 @@ impl LightClient {
         let mut unspent_sapling_notes: Vec<JsonValue> = vec![];
         let mut pending_spent_sapling_notes: Vec<JsonValue> = vec![];
         let mut spent_sapling_notes: Vec<JsonValue> = vec![];
-        // Collect Sapling notes
-        self.wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
-            .flat_map( |(transaction_id, transaction_metadata)| {
-                transaction_metadata.sapling_notes.iter().filter_map(move |note_metadata|
-                    if !all_notes && note_metadata.spending_tx_status().is_some() {
-                        None
-                    } else {
-                        let address = LightWallet::note_address::<sapling_crypto::note_encryption::SaplingDomain>(&self.config.chain, note_metadata, &self.wallet.wallet_capability());
-                        let spendable = transaction_metadata.status.is_confirmed() && note_metadata.spending_tx_status().is_none();
-
-                        let created_block:u32 = transaction_metadata.status.get_height().into();
-                        // this object should be created by the DomainOuput trait if this doesnt get deprecated
-                        Some(object!{
-                            "created_in_block"   => created_block,
-                            "datetime"           => transaction_metadata.datetime,
-                            "created_in_txid"    => format!("{}", transaction_id),
-                            "value"              => note_metadata.sapling_crypto_note.value().inner(),
-                            "pending"        => !transaction_metadata.status.is_confirmed(),
-                            "address"            => address,
-                            "spendable"          => spendable,
-                            "spent"    => note_metadata.spending_tx_status().and_then(|(s_txid, status)| {if status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "pending_spent"    => note_metadata.spending_tx_status().and_then(|(s_txid, status)| {if !status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "spent_at_height"    => note_metadata.spending_tx_status().map(|(_, status)| u32::from(status.get_height())),
-                        })
-                    }
-                )
-            })
-            .for_each( |note| {
-                self.unspent_pending_spent(note, &mut unspent_sapling_notes, &mut pending_spent_sapling_notes, &mut spent_sapling_notes)
-            });
-        (
-            unspent_sapling_notes,
-            spent_sapling_notes,
-            pending_spent_sapling_notes,
-        )
-    }
-    #[cfg(feature = "sync")]
-    async fn list_sapling_notes(
-        &self,
-        all_notes: bool,
-    ) -> (Vec<JsonValue>, Vec<JsonValue>, Vec<JsonValue>) {
-        let mut unspent_sapling_notes: Vec<JsonValue> = vec![];
-        let mut pending_spent_sapling_notes: Vec<JsonValue> = vec![];
-        let mut spent_sapling_notes: Vec<JsonValue> = vec![];
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
 
         // Collect Sapling notes
         wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
