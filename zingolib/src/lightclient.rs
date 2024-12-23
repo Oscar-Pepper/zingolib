@@ -349,29 +349,14 @@ pub mod instantiation {
         // toDo rework ZingoConfig.
 
         /// This is the fundamental invocation of a LightClient. It lives in an asyncronous runtime.
-        #[cfg(not(feature = "sync"))]
         pub async fn create_from_wallet_async(wallet: LightWallet) -> io::Result<Self> {
             let mut buffer: Vec<u8> = vec![];
             wallet.write(&mut buffer).await?;
             let config = wallet.transaction_context.config.clone();
             Ok(LightClient {
+                #[cfg(not(feature = "sync"))]
                 wallet,
-                config: config.clone(),
-                mempool_monitor: std::sync::RwLock::new(None),
-                sync_lock: Mutex::new(()),
-                bsync_data: Arc::new(RwLock::new(BlazeSyncData::new())),
-                interrupt_sync: Arc::new(RwLock::new(false)),
-                latest_proposal: Arc::new(RwLock::new(None)),
-                save_buffer: ZingoSaveBuffer::new(buffer),
-            })
-        }
-        /// This is the fundamental invocation of a LightClient. It lives in an asyncronous runtime.
-        #[cfg(feature = "sync")]
-        pub async fn create_from_wallet_async(wallet: LightWallet) -> io::Result<Self> {
-            let mut buffer: Vec<u8> = vec![];
-            wallet.write(&mut buffer).await?;
-            let config = wallet.transaction_context.config.clone();
-            Ok(LightClient {
+                #[cfg(feature = "sync")]
                 wallet: Arc::new(Mutex::new(wallet)),
                 config: config.clone(),
                 #[cfg(not(feature = "sync"))]
