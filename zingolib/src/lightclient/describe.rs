@@ -1242,23 +1242,8 @@ impl LightClient {
 
     /// Get all the outputs packed into an Output vector
     ///  This method will replace do_list_notes
-    #[cfg(not(feature = "sync"))]
     pub async fn list_outputs(&self) -> Vec<crate::wallet::notes::Output> {
-        self.wallet
-            .transaction_context
-            .transaction_metadata_set
-            .read()
-            .await
-            .transaction_records_by_id
-            .0
-            .values()
-            .flat_map(Output::get_record_outputs)
-            .collect()
-    }
-    #[cfg(feature = "sync")]
-    pub async fn list_outputs(&self) -> Vec<crate::wallet::notes::Output> {
-        self.wallet
-            .lock()
+        self.wallet_mut()
             .await
             .transaction_context
             .transaction_metadata_set
