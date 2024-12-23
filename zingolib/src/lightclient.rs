@@ -506,12 +506,22 @@ pub mod propose;
 
 // other functions
 impl LightClient {
+    /// a helper function to unlock the wallet state from whatever type of Arc it is in
+    /// dont worry that &self isnt mut. it contains a Mutex
+    #[cfg(not(feature = "sync"))]
+    pub async fn wallet_mut(&self) -> &LightWallet {
+        &self.wallet
+    }
+    /// a helper function to unlock the wallet state from whatever type of Arc it is in
+    /// dont worry that &self isnt mut. it contains a Mutex
+    #[cfg(feature = "sync")]
+    pub async fn wallet_mut(&self) -> tokio::sync::MutexGuard<'_, LightWallet> {
+        self.wallet.lock().await
+    }
+
     /// TODO: Add Doc Comment Here!
     pub async fn clear_state(&self) {
-        #[cfg(not(feature = "sync"))]
-        let wallet: &LightWallet = &self.wallet;
-        #[cfg(feature = "sync")]
-        let wallet: tokio::sync::MutexGuard<'_, LightWallet> = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
 
         // First, clear the state from the wallet
         wallet.clear_all().await;
