@@ -1142,7 +1142,6 @@ impl LightClient {
         )
     }
 
-    #[cfg(not(feature = "sync"))]
     async fn list_transparent_outputs(
         &self,
         all_notes: bool,
@@ -1150,55 +1149,7 @@ impl LightClient {
         let mut unspent_transparent_notes: Vec<JsonValue> = vec![];
         let mut pending_spent_transparent_note: Vec<JsonValue> = vec![];
         let mut spent_transparent_notes: Vec<JsonValue> = vec![];
-
-        self.wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
-            .flat_map( |(transaction_id, transaction_record)| {
-                transaction_record.transparent_outputs.iter().filter_map(move |utxo|
-                    if !all_notes && utxo.is_spent_confirmed() {
-                        None
-                    } else {
-                        let created_block:u32 = transaction_record.status.get_height().into();
-                        let recipient = zcash_client_backend::address::Address::decode(&self.config.chain, &utxo.address);
-                        let taddr = match recipient {
-                        Some(zcash_client_backend::address::Address::Transparent(taddr)) => taddr,
-                            _otherwise => panic!("Read invalid taddr from wallet-local Utxo, this should be impossible"),
-                        };
-
-                        let spendable = transaction_record.status.is_confirmed() && utxo.spending_tx_status().is_none();
-                        Some(object!{
-                            "created_in_block"   => created_block,
-                            "datetime"           => transaction_record.datetime,
-                            "created_in_txid"    => format!("{}", transaction_id),
-                            "value"              => utxo.value,
-                            "scriptkey"          => hex::encode(utxo.script.clone()),
-                            "address"            => self.wallet.wallet_capability().get_ua_from_contained_transparent_receiver(&taddr).map(|ua| ua.encode(&self.config.chain)),
-                            "spendable"          => spendable,
-                            "spent"    => utxo.spending_tx_status().and_then(|(s_txid, status)| {if status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "pending_spent"    => utxo.spending_tx_status().and_then(|(s_txid, status)| {if !status.is_confirmed() {Some(format!("{}", s_txid))} else {None}}),
-                            "spent_at_height"    => utxo.spending_tx_status().map(|(_, status)| u32::from(status.get_height())),
-                        })
-                    }
-                )
-            })
-            .for_each( |note| {
-                self.unspent_pending_spent(note, &mut unspent_transparent_notes, &mut pending_spent_transparent_note, &mut spent_transparent_notes)
-            });
-
-        (
-            unspent_transparent_notes,
-            spent_transparent_notes,
-            pending_spent_transparent_note,
-        )
-    }
-    #[cfg(feature = "sync")]
-    async fn list_transparent_outputs(
-        &self,
-        all_notes: bool,
-    ) -> (Vec<JsonValue>, Vec<JsonValue>, Vec<JsonValue>) {
-        let mut unspent_transparent_notes: Vec<JsonValue> = vec![];
-        let mut pending_spent_transparent_note: Vec<JsonValue> = vec![];
-        let mut spent_transparent_notes: Vec<JsonValue> = vec![];
-        let wallet = self.wallet.lock().await;
+        let wallet = self.wallet_mut().await;
 
         wallet.transaction_context.transaction_metadata_set.read().await.transaction_records_by_id.iter()
             .flat_map( |(transaction_id, transaction_record)| {
