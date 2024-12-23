@@ -569,22 +569,12 @@ pub mod send_with_proposal {
         }
 
         /// Creates, signs and broadcasts transactions from a transaction request without confirmation.
-        #[cfg(not(feature = "sync"))]
-        pub async fn quick_send(
-            &self,
-            request: TransactionRequest,
-        ) -> Result<NonEmpty<TxId>, QuickSendError> {
-            let proposal = self.wallet.create_send_proposal(request).await?;
-            Ok(self.complete_and_broadcast::<NoteId>(&proposal).await?)
-        }
-        #[cfg(feature = "sync")]
         pub async fn quick_send(
             &self,
             request: TransactionRequest,
         ) -> Result<NonEmpty<TxId>, QuickSendError> {
             let proposal = self
-                .wallet
-                .lock()
+                .wallet_mut()
                 .await
                 .create_send_proposal(request)
                 .await?;
