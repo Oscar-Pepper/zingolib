@@ -15,18 +15,8 @@ impl LightClient {
     }
 
     /// TODO: Add Doc Comment Here!
-    #[cfg(not(feature = "sync"))]
     pub async fn do_send_progress(&self) -> Result<LightWalletSendProgress, String> {
-        let progress = self.wallet.get_send_progress().await;
-        Ok(LightWalletSendProgress {
-            progress: progress.clone(),
-            interrupt_sync: *self.interrupt_sync.read().await,
-        })
-    }
-    /// TODO: Add Doc Comment Here!
-    #[cfg(feature = "sync")]
-    pub async fn do_send_progress(&self) -> Result<LightWalletSendProgress, String> {
-        let progress = self.wallet.lock().await.get_send_progress().await;
+        let progress = self.wallet_mut().await.get_send_progress().await;
         Ok(LightWalletSendProgress {
             progress: progress.clone(),
             interrupt_sync: *self.interrupt_sync.read().await,
