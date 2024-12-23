@@ -332,7 +332,6 @@ where
 }
 
 /// the simplest test that sends from a specific shielded pool to another specific pool. error variant.
-#[cfg(not(feature = "sync"))]
 pub async fn shpool_to_pool_insufficient_error<CC>(
     shpool: ShieldedProtocol,
     pool: PoolType,
@@ -367,62 +366,7 @@ pub async fn shpool_to_pool_insufficient_error<CC>(
             &ref_secondary,
             vec![(
                 ref_tertiary
-                    .wallet
-                    .get_first_address(pool)
-                    .unwrap()
-                    .as_str(),
-                tertiary_fund,
-                None,
-            )],
-        )
-        .await
-        .unwrap_err()
-        .to_string(),
-        format!(
-            "Insufficient balance (have {}, need {} including fee)",
-            secondary_fund,
-            tertiary_fund + expected_fee
-        )
-    );
-}
-/// the simplest test that sends from a specific shielded pool to another specific pool. error variant.
-#[cfg(feature = "sync")]
-pub async fn shpool_to_pool_insufficient_error<CC>(
-    shpool: ShieldedProtocol,
-    pool: PoolType,
-    underflow_amount: u64,
-) where
-    CC: ConductChain,
-{
-    let mut environment = CC::setup().await;
-
-    let primary = environment.fund_client_orchard(1_000_000).await;
-    let secondary = environment.create_client().await;
-
-    let expected_fee = fee_tables::one_to_one(Some(shpool), pool, true);
-    let secondary_fund = 100_000 + expected_fee - underflow_amount;
-    with_assertions::propose_send_bump_sync_all_recipients(
-        &mut environment,
-        &primary,
-        vec![(&secondary, Shielded(shpool), secondary_fund, None)],
-        false,
-    )
-    .await
-    .unwrap();
-
-    let tertiary = environment.create_client().await;
-
-    let ref_secondary: Arc<LightClient> = Arc::new(secondary);
-    let ref_tertiary: Arc<LightClient> = Arc::new(tertiary);
-
-    let tertiary_fund = 100_000;
-    assert_eq!(
-        from_inputs::propose(
-            &ref_secondary,
-            vec![(
-                ref_tertiary
-                    .wallet
-                    .lock()
+                    .wallet_mut()
                     .await
                     .get_first_address(pool)
                     .unwrap()
