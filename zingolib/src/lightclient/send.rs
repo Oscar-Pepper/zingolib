@@ -140,73 +140,10 @@ pub mod send_with_proposal {
         /// After some consideration we don't see why the spending_data should
         /// be stored out-of-order with respect to earlier transactions funding
         /// later ones in the cache, so we implement an in order cache.
-        #[cfg(not(feature = "sync"))]
         async fn record_created_transactions(
             &self,
         ) -> Result<Vec<TxId>, RecordCachedTransactionsError> {
-            let mut tx_map = self
-                .wallet
-                .transaction_context
-                .transaction_metadata_set
-                .write()
-                .await;
-            let current_height = self
-                .get_latest_block_height()
-                .await
-                .map_err(RecordCachedTransactionsError::Height)?;
-            let mut transactions_to_record = vec![];
-            if let Some(spending_data) = &mut tx_map.spending_data {
-                for (_txid, raw_tx) in spending_data.cached_raw_transactions.iter() {
-                    transactions_to_record.push(Transaction::read(
-                        raw_tx.as_slice(),
-                        zcash_primitives::consensus::BranchId::for_height(
-                            &self.wallet.transaction_context.config.chain,
-                            current_height + 1,
-                        ),
-                    )?);
-                }
-            } else {
-                return Err(RecordCachedTransactionsError::Cache(
-                    TransactionCacheError::NoSpendCapability,
-                ));
-            }
-            drop(tx_map);
-            let mut txids = vec![];
-            for transaction in transactions_to_record {
-                self.wallet
-                    .transaction_context
-                    .scan_full_tx(
-                        &transaction,
-                        ConfirmationStatus::Calculated(current_height + 1),
-                        Some(now() as u32),
-                        crate::wallet::utils::get_price(
-                            now(),
-                            &self.wallet.price.read().await.clone(),
-                        ),
-                    )
-                    .await;
-                self.wallet
-                    .transaction_context
-                    .transaction_metadata_set
-                    .write()
-                    .await
-                    .transaction_records_by_id
-                    .update_note_spend_statuses(
-                        transaction.txid(),
-                        Some((
-                            transaction.txid(),
-                            ConfirmationStatus::Calculated(current_height + 1),
-                        )),
-                    );
-                txids.push(transaction.txid());
-            }
-            Ok(txids)
-        }
-        #[cfg(feature = "sync")]
-        async fn record_created_transactions(
-            &self,
-        ) -> Result<Vec<TxId>, RecordCachedTransactionsError> {
-            let wallet = self.wallet.lock().await;
+            let wallet = self.wallet_mut().await;
             let mut tx_map = wallet
                 .transaction_context
                 .transaction_metadata_set
