@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use bip0039::Mnemonic;
 use json::JsonValue;
 
+use pepper_sync::wallet::OutgoingOutputInterface;
 use zcash_address::ZcashAddress;
 use zcash_keys::encoding::encode_payment_address;
 use zcash_primitives::consensus::NetworkConstants as _;
@@ -259,6 +260,7 @@ impl LightWallet {
             && (!transaction.orchard_notes().is_empty() || !transaction.sapling_notes().is_empty())
         {
             Ok(TransactionKind::Sent(SendType::Shield))
+            // FIXME: use outgoing coins
         } else if transaction
             .transaction()
             .transparent_bundle()

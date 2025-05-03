@@ -26,7 +26,7 @@ use zcash_client_backend::{
 use zcash_keys::{address::UnifiedAddress, encoding::encode_payment_address};
 use zcash_primitives::{
     block::BlockHash,
-    legacy::Script,
+    legacy::{Script, TransparentAddress},
     memo::Memo,
     transaction::{TxId, components::transparent::OutPoint},
 };
@@ -41,7 +41,10 @@ use zingo_status::confirmation_status::ConfirmationStatus;
 use crate::{
     client::FetchRequest,
     error::{ServerError, SyncModeError},
-    keys::{self, KeyId, transparent::TransparentAddressId},
+    keys::{
+        self, KeyId,
+        transparent::{self, TransparentAddressId},
+    },
     scan::compact_blocks::calculate_block_tree_bounds,
     sync::MAX_VERIFICATION_WINDOW,
     witness,
@@ -406,6 +409,7 @@ pub struct WalletTransaction {
     pub(crate) transparent_coins: Vec<TransparentCoin>,
     pub(crate) sapling_notes: Vec<SaplingNote>,
     pub(crate) orchard_notes: Vec<OrchardNote>,
+    pub(crate) outgoing_transparent_coins: Vec<OutgoingTransparentCoin>,
     pub(crate) outgoing_sapling_notes: Vec<OutgoingSaplingNote>,
     pub(crate) outgoing_orchard_notes: Vec<OutgoingOrchardNote>,
 }
@@ -518,17 +522,11 @@ impl WalletTransaction {
 impl WalletTransaction {
     /// Returns the total value sent to receivers, excluding value sent to the wallet's own addresses.
     pub fn total_value_sent(&self) -> u64 {
-        let transparent_value_sent = self.transaction.transparent_bundle().map_or(0, |bundle| {
-            bundle
-                .vout
-                .iter()
-                .map(|output| output.value.into_u64())
-                .sum()
-        }) - self.total_output_value::<TransparentCoin>();
-
-        let sapling_value_sent = self.total_outgoing_note_value::<OutgoingSaplingNote>()
+        let transparent_value_sent = self.total_outgoing_output_value::<OutgoingTransparentCoin>()
+            - self.total_output_value::<TransparentCoin>();
+        let sapling_value_sent = self.total_outgoing_output_value::<OutgoingSaplingNote>()
             - self.total_output_value::<SaplingNote>();
-        let orchard_value_sent = self.total_outgoing_note_value::<OutgoingOrchardNote>()
+        let orchard_value_sent = self.total_outgoing_output_value::<OutgoingOrchardNote>()
             - self.total_output_value::<OrchardNote>();
 
         transparent_value_sent + sapling_value_sent + orchard_value_sent
@@ -549,9 +547,9 @@ impl WalletTransaction {
             .sum()
     }
 
-    /// Returns total sum of outgoing note values for a given shielded pool.
-    pub fn total_outgoing_note_value<Op: OutgoingNoteInterface>(&self) -> u64 {
-        Op::transaction_outgoing_notes(self)
+    /// Returns total sum of outgoing output values for a given pool.
+    pub fn total_outgoing_output_value<Op: OutgoingOutputInterface>(&self) -> u64 {
+        Op::transaction_outgoing_outputs(self)
             .iter()
             .map(|note| note.value())
             .sum()
@@ -858,32 +856,26 @@ impl NoteInterface for OrchardNote {
     }
 }
 
-/// Provides a common API for all outgoing note types.
-pub trait OutgoingNoteInterface: Sized {
-    /// Decrypted note type.
-    type ZcashNote;
+/// Provides a common API for all outgoing output types.
+pub trait OutgoingOutputInterface: Sized {
+    /// Identifier for key used to decrypt output.
+    type KeyId;
     /// Address type.
     type Address: Clone + Copy + Debug + PartialEq + Eq;
     /// Encoding error
     type Error: Debug + std::error::Error;
 
-    /// Note's associated shielded protocol.
-    const SHIELDED_PROTOCOL: ShieldedProtocol;
+    /// Output's associated pool type.
+    const POOL: PoolType;
 
     /// Output ID.
     fn output_id(&self) -> OutputId;
 
     /// Identifier for key used to decrypt outgoing note.
-    fn key_id(&self) -> KeyId;
+    fn key_id(&self) -> Self::KeyId;
 
     /// Note value.
     fn value(&self) -> u64;
-
-    /// Decrypted note with recipient and value.
-    fn note(&self) -> &Self::ZcashNote;
-
-    /// Memo.
-    fn memo(&self) -> &Memo;
 
     /// Recipient address.
     fn recipient(&self) -> Self::Address;
@@ -892,7 +884,7 @@ pub trait OutgoingNoteInterface: Sized {
     fn recipient_full_unified_address(&self) -> Option<&UnifiedAddress>;
 
     /// Encoded recipient address recorded in note on chain (single receiver).
-    fn encoded_recipient<P>(&self, parameters: &P) -> Result<String, Self::Error>
+    fn encoded_recipient<P>(&self, consensus_parameters: &P) -> Result<String, Self::Error>
     where
         P: consensus::Parameters + consensus::NetworkConstants;
 
@@ -901,8 +893,98 @@ pub trait OutgoingNoteInterface: Sized {
     where
         P: consensus::Parameters + consensus::NetworkConstants;
 
-    /// Outgoing notes within `transaction`.
-    fn transaction_outgoing_notes(transaction: &WalletTransaction) -> &[Self];
+    /// Sets encoded recipient's full unified address.
+    fn set_recipient_full_unified_address(&mut self, full_unified_address: Option<UnifiedAddress>);
+
+    /// Outgoing outputs within `transaction`.
+    fn transaction_outgoing_outputs(transaction: &WalletTransaction) -> &[Self];
+}
+
+/// Transparent coin sent from this capability to a recipient.
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutgoingTransparentCoin {
+    /// Output ID.
+    pub(crate) output_id: OutputId,
+    /// Identifier for key used to decrypt output.
+    pub(crate) key_id: TransparentAddressId,
+    /// Transparent address.
+    pub(crate) address: TransparentAddress,
+    /// Script.
+    pub(crate) script: Script,
+    /// Coin value.
+    pub(crate) value: Zatoshis,
+    /// Recipient's full unified address from encoded memo.
+    pub(crate) recipient_full_unified_address: Option<UnifiedAddress>,
+}
+
+impl OutgoingOutputInterface for OutgoingTransparentCoin {
+    type KeyId = TransparentAddressId;
+    type Address = TransparentAddress;
+    type Error = Infallible;
+
+    const POOL: PoolType = PoolType::TRANSPARENT;
+
+    fn output_id(&self) -> OutputId {
+        self.output_id
+    }
+
+    fn key_id(&self) -> Self::KeyId {
+        self.key_id
+    }
+
+    fn value(&self) -> u64 {
+        self.value.into_u64()
+    }
+
+    fn recipient(&self) -> Self::Address {
+        self.address
+    }
+
+    fn recipient_full_unified_address(&self) -> Option<&UnifiedAddress> {
+        self.recipient_full_unified_address.as_ref()
+    }
+
+    fn encoded_recipient<P>(&self, consensus_parameters: &P) -> Result<String, Self::Error>
+    where
+        P: consensus::Parameters + consensus::NetworkConstants,
+    {
+        Ok(transparent::encode_address(
+            consensus_parameters,
+            self.address,
+        ))
+    }
+
+    fn encoded_recipient_full_unified_address<P>(&self, consensus_parameters: &P) -> Option<String>
+    where
+        P: consensus::Parameters + consensus::NetworkConstants,
+    {
+        self.recipient_full_unified_address
+            .as_ref()
+            .map(|unified_address| unified_address.encode(consensus_parameters))
+    }
+
+    fn set_recipient_full_unified_address(&mut self, full_unified_address: Option<UnifiedAddress>) {
+        self.recipient_full_unified_address = full_unified_address;
+    }
+
+    fn transaction_outgoing_outputs(transaction: &WalletTransaction) -> &[Self] {
+        &transaction.outgoing_transparent_coins
+    }
+}
+
+/// Provides a common API for all outgoing note types.
+pub trait OutgoingNoteInterface: OutgoingOutputInterface {
+    /// Decrypted note type.
+    type ZcashNote;
+
+    /// Note's associated shielded protocol.
+    const SHIELDED_PROTOCOL: ShieldedProtocol;
+
+    /// Decrypted note with recipient and value.
+    fn note(&self) -> &Self::ZcashNote;
+
+    /// Memo.
+    fn memo(&self) -> &Memo;
 }
 
 /// Note sent from this capability to a recipient.
@@ -923,12 +1005,12 @@ pub struct OutgoingNote<N> {
 /// Outgoing sapling note.
 pub type OutgoingSaplingNote = OutgoingNote<sapling_crypto::Note>;
 
-impl OutgoingNoteInterface for OutgoingSaplingNote {
-    type ZcashNote = sapling_crypto::Note;
+impl OutgoingOutputInterface for OutgoingSaplingNote {
+    type KeyId = KeyId;
     type Address = sapling_crypto::PaymentAddress;
     type Error = Infallible;
 
-    const SHIELDED_PROTOCOL: ShieldedProtocol = ShieldedProtocol::Sapling;
+    const POOL: PoolType = PoolType::SAPLING;
 
     fn output_id(&self) -> OutputId {
         self.output_id
@@ -940,14 +1022,6 @@ impl OutgoingNoteInterface for OutgoingSaplingNote {
 
     fn value(&self) -> u64 {
         self.note.value().inner()
-    }
-
-    fn note(&self) -> &Self::ZcashNote {
-        &self.note
-    }
-
-    fn memo(&self) -> &Memo {
-        &self.memo
     }
 
     fn recipient(&self) -> Self::Address {
@@ -977,20 +1051,38 @@ impl OutgoingNoteInterface for OutgoingSaplingNote {
             .map(|unified_address| unified_address.encode(consensus_parameters))
     }
 
-    fn transaction_outgoing_notes(transaction: &WalletTransaction) -> &[Self] {
+    fn set_recipient_full_unified_address(&mut self, full_unified_address: Option<UnifiedAddress>) {
+        self.recipient_full_unified_address = full_unified_address;
+    }
+
+    fn transaction_outgoing_outputs(transaction: &WalletTransaction) -> &[Self] {
         &transaction.outgoing_sapling_notes
+    }
+}
+
+impl OutgoingNoteInterface for OutgoingSaplingNote {
+    type ZcashNote = sapling_crypto::Note;
+
+    const SHIELDED_PROTOCOL: ShieldedProtocol = ShieldedProtocol::Sapling;
+
+    fn note(&self) -> &Self::ZcashNote {
+        &self.note
+    }
+
+    fn memo(&self) -> &Memo {
+        &self.memo
     }
 }
 
 /// Outgoing orchard note.
 pub type OutgoingOrchardNote = OutgoingNote<orchard::Note>;
 
-impl OutgoingNoteInterface for OutgoingOrchardNote {
-    type ZcashNote = orchard::Note;
+impl OutgoingOutputInterface for OutgoingOrchardNote {
+    type KeyId = KeyId;
     type Address = orchard::Address;
     type Error = ParseError;
 
-    const SHIELDED_PROTOCOL: ShieldedProtocol = ShieldedProtocol::Orchard;
+    const POOL: PoolType = PoolType::ORCHARD;
 
     fn output_id(&self) -> OutputId {
         self.output_id
@@ -1004,14 +1096,6 @@ impl OutgoingNoteInterface for OutgoingOrchardNote {
         self.note.value().inner()
     }
 
-    fn note(&self) -> &Self::ZcashNote {
-        &self.note
-    }
-
-    fn memo(&self) -> &Memo {
-        &self.memo
-    }
-
     fn recipient(&self) -> Self::Address {
         self.note.recipient()
     }
@@ -1020,11 +1104,11 @@ impl OutgoingNoteInterface for OutgoingOrchardNote {
         self.recipient_full_unified_address.as_ref()
     }
 
-    fn encoded_recipient<P>(&self, parameters: &P) -> Result<String, Self::Error>
+    fn encoded_recipient<P>(&self, consensus_parameters: &P) -> Result<String, Self::Error>
     where
         P: consensus::Parameters + consensus::NetworkConstants,
     {
-        keys::encode_orchard_receiver(parameters, &self.note().recipient())
+        keys::encode_orchard_receiver(consensus_parameters, &self.note().recipient())
     }
 
     fn encoded_recipient_full_unified_address<P>(&self, consensus_parameters: &P) -> Option<String>
@@ -1036,8 +1120,26 @@ impl OutgoingNoteInterface for OutgoingOrchardNote {
             .map(|unified_address| unified_address.encode(consensus_parameters))
     }
 
-    fn transaction_outgoing_notes(transaction: &WalletTransaction) -> &[Self] {
+    fn set_recipient_full_unified_address(&mut self, full_unified_address: Option<UnifiedAddress>) {
+        self.recipient_full_unified_address = full_unified_address;
+    }
+
+    fn transaction_outgoing_outputs(transaction: &WalletTransaction) -> &[Self] {
         &transaction.outgoing_orchard_notes
+    }
+}
+
+impl OutgoingNoteInterface for OutgoingOrchardNote {
+    type ZcashNote = orchard::Note;
+
+    const SHIELDED_PROTOCOL: ShieldedProtocol = ShieldedProtocol::Orchard;
+
+    fn note(&self) -> &Self::ZcashNote {
+        &self.note
+    }
+
+    fn memo(&self) -> &Memo {
+        &self.memo
     }
 }
 

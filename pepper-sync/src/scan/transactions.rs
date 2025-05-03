@@ -21,7 +21,7 @@ use zcash_primitives::{
     zip32::AccountId,
 };
 use zcash_protocol::{
-    ShieldedProtocol,
+    PoolType,
     consensus::{self, BlockHeight, NetworkConstants},
 };
 
@@ -31,10 +31,13 @@ use zingo_status::confirmation_status::ConfirmationStatus;
 use crate::{
     client::{self, FetchRequest},
     error::ScanError,
-    keys::{self, KeyId, transparent::TransparentAddressId},
+    keys::{
+        self, KeyId,
+        transparent::{self, TransparentAddressId},
+    },
     wallet::{
-        Locator, NullifierMap, OrchardNote, OutgoingNote, OutgoingNoteInterface,
-        OutgoingOrchardNote, OutgoingSaplingNote, OutputId, SaplingNote, TransparentCoin,
+        Locator, NullifierMap, OrchardNote, OutgoingNote, OutgoingOrchardNote,
+        OutgoingOutputInterface, OutgoingSaplingNote, OutputId, SaplingNote, TransparentCoin,
         WalletBlock, WalletNote, WalletTransaction,
     },
 };
@@ -470,39 +473,46 @@ fn parse_encoded_memos<N, Nf: Copy>(wallet_notes: &[WalletNote<N, Nf>]) -> Vec<P
         .collect()
 }
 
-fn add_recipient_unified_address<P, Nz>(
+fn add_recipient_unified_address<P, Op>(
     consensus_parameters: &P,
     unified_addresses: Vec<UnifiedAddress>,
-    outgoing_notes: &mut [OutgoingNote<Nz>],
+    outgoing_outputs: &mut [Op],
 ) -> Result<(), ScanError>
 where
     P: consensus::Parameters + NetworkConstants,
-    OutgoingNote<Nz>: OutgoingNoteInterface,
+    Op: OutgoingOutputInterface,
 {
     for unified_address in unified_addresses {
-        let encoded_address = match <OutgoingNote<Nz>>::SHIELDED_PROTOCOL {
-            ShieldedProtocol::Sapling => unified_address.sapling().map(|address| {
+        let encoded_address = match Op::POOL {
+            PoolType::TRANSPARENT => unified_address.transparent().map(|address| {
+                Ok(transparent::encode_address(
+                    consensus_parameters,
+                    address.clone(),
+                ))
+            }),
+            PoolType::SAPLING => unified_address.sapling().map(|address| {
                 Ok(zcash_keys::encoding::encode_payment_address(
                     consensus_parameters.hrp_sapling_payment_address(),
                     address,
                 ))
             }),
-            ShieldedProtocol::Orchard => unified_address
+            PoolType::ORCHARD => unified_address
                 .orchard()
                 .map(|address| keys::encode_orchard_receiver(consensus_parameters, address)),
         }
         .transpose()?;
-        outgoing_notes
+        outgoing_outputs
             .iter_mut()
-            .filter(|note| {
-                if let Ok(note_encoded_recipient) = note.encoded_recipient(consensus_parameters) {
-                    encoded_address == Some(note_encoded_recipient)
+            .filter(|output| {
+                if let Ok(output_encoded_recipient) = output.encoded_recipient(consensus_parameters)
+                {
+                    encoded_address == Some(output_encoded_recipient)
                 } else {
                     false
                 }
             })
-            .for_each(|note| {
-                note.recipient_full_unified_address = Some(unified_address.clone());
+            .for_each(|output| {
+                output.set_recipient_full_unified_address(Some(unified_address.clone()));
             });
     }
 
