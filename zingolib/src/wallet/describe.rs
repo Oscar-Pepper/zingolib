@@ -271,15 +271,17 @@ impl LightWallet {
                 .all(|outgoing_note| {
                     if let Some(full_address) = outgoing_note.recipient_full_unified_address() {
                         full_address.sapling().is_none_or(|address| {
-                            self.is_sapling_send_to_self(address)
+                            self.is_sapling_external_send_to_self(address)
                                 .expect("must have sapling view capability in this scope")
+                                || outgoing_note.key_id().scope == zip32::Scope::Internal
                         }) || outgoing_note
                             .encoded_recipient_full_unified_address(&self.network)
                             .expect("should exist in this scope")
                             == *zfz_address
                     } else {
-                        self.is_sapling_send_to_self(&outgoing_note.note().recipient())
+                        self.is_sapling_external_send_to_self(&outgoing_note.note().recipient())
                             .expect("must have sapling view capability in this scope")
+                            || outgoing_note.key_id().scope == zip32::Scope::Internal
                     }
                 })
             && transaction
@@ -308,7 +310,6 @@ impl LightWallet {
 
     /// Provides a list of transaction summaries related to this wallet in order of blockheight
     // TODO: move to summary
-    // TODO: should have outgoing coins
     pub async fn transaction_summaries(&self) -> Result<TransactionSummaries, SummaryError> {
         let mut transaction_summaries = self
             .wallet_transactions
@@ -505,6 +506,7 @@ impl LightWallet {
                 }
             })
             .collect::<Vec<_>>();
+
         Ok((
             kind,
             value,
@@ -844,20 +846,24 @@ impl LightWallet {
 
             let send_to_external_recipient = match decode_address(&self.network, &encoded_address)?
             {
-                zcash_keys::address::Address::Sapling(address) => !self
-                    .is_sapling_send_to_self(&address)
-                    .expect("should have sapling view capability in this scope"),
                 zcash_keys::address::Address::Transparent(address) => {
-                    !self.is_transparent_send_to_self(&address).is_none()
+                    self.is_transparent_send_to_self(&address).is_none()
+                }
+                zcash_keys::address::Address::Sapling(address) => {
+                    !self
+                        .is_sapling_external_send_to_self(&address)
+                        .expect("should have sapling view capability in this scope")
+                        && note.scope == summary::Scope::External
                 }
                 zcash_keys::address::Address::Unified(address) => {
                     address
                         .transparent()
-                        .is_none_or(|addr| !self.is_transparent_send_to_self(addr).is_none())
+                        .is_none_or(|addr| self.is_transparent_send_to_self(addr).is_none())
                         && address.sapling().is_none_or(|addr| {
                             !self
-                                .is_sapling_send_to_self(addr)
+                                .is_sapling_external_send_to_self(addr)
                                 .expect("should have sapling view capability in this scope")
+                                && note.scope == summary::Scope::External
                         })
                         && address.orchard().is_none_or(|addr| {
                             !self
@@ -931,7 +937,9 @@ impl LightWallet {
             .map(|(address_id, _)| address_id.scope())
     }
 
-    fn is_sapling_send_to_self(
+    /// Checks if the given `address` is derived from the wallet's sapling FVKs. External scope only. For internal, query
+    /// outgoing sapling note scope.
+    fn is_sapling_external_send_to_self(
         &self,
         address: &sapling_crypto::PaymentAddress,
     ) -> Result<bool, KeyError> {
@@ -942,6 +950,7 @@ impl LightWallet {
         )
     }
 
+    /// Checks if the given `address` is derived from the wallet's orchard FVKs.
     fn is_orchard_send_to_self(&self, address: &orchard::Address) -> Result<bool, KeyError> {
         Ok(
             orchard::keys::FullViewingKey::try_from(&self.unified_key_store)?
