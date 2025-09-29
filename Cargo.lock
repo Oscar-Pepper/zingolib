@@ -7356,8 +7356,7 @@ dependencies = [
 [[package]]
 name = "tower-batch-control"
 version = "0.2.41"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a6823ca72ad0d8ebf40ddfe11c104f0ccb242befb7fd3bc20c33b6798a31eba"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "futures",
  "futures-core",
@@ -7373,8 +7372,7 @@ dependencies = [
 [[package]]
 name = "tower-fallback"
 version = "0.2.41"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4434e19ee996ee5c6aa42f11463a355138452592e5c5b5b73b6f0f19534556af"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "futures-core",
  "pin-project",
@@ -7983,17 +7981,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "which"
-version = "8.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3fabb953106c3c8eea8306e4393700d7657561cb43122571b172bbfb7c7ba1d"
-dependencies = [
- "env_home",
- "rustix 1.1.2",
- "winsafe",
-]
-
-[[package]]
 name = "winapi"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8516,7 +8503,7 @@ dependencies = [
  "tracing",
  "trait-variant",
  "webpki-roots 0.26.11",
- "which 7.0.3",
+ "which",
  "zcash_address 0.9.0 (git+https://github.com/zcash/librustzcash?rev=d387aed7e04e881dbe30c6ff8b26a96c834c094b)",
  "zcash_encoding 0.3.0 (git+https://github.com/zcash/librustzcash?rev=d387aed7e04e881dbe30c6ff8b26a96c834c094b)",
  "zcash_keys 0.10.0",
@@ -8616,7 +8603,7 @@ dependencies = [
 [[package]]
 name = "zcash_local_net"
 version = "0.1.0"
-source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#c5100848657acdd079f2cef98f7e5925fb4ee5aa"
+source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#3434eef4f690194385d8b43fc2ad256002a828b0"
 dependencies = [
  "getset",
  "hex",
@@ -8939,8 +8926,7 @@ dependencies = [
 [[package]]
 name = "zebra-consensus"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19a44698a96b007f00da9a2e4c4cdee6c5adfc22996bdeb06ccc781b96d597c0"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "bellman",
  "blake2b_simd",
@@ -8977,8 +8963,7 @@ dependencies = [
 [[package]]
 name = "zebra-network"
 version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0230d1e515518e0ef33ca668f3abb98e364485f384f7ee101506ec64bca7e7d3"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "bitflags 2.9.4",
  "byteorder",
@@ -9014,8 +8999,7 @@ dependencies = [
 [[package]]
 name = "zebra-node-services"
 version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c808614a9d245ae8d6d3177c06a8c78c2a8566219b090d6a85dc46f4364eadad"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "color-eyre",
  "jsonrpsee-types",
@@ -9028,9 +9012,8 @@ dependencies = [
 
 [[package]]
 name = "zebra-rpc"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1ae56eb3c668366a751621f40e1c0569c32ae92467ec1f8bac5b755db308126"
+version = "2.0.0"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "base64",
  "chrono",
@@ -9059,7 +9042,6 @@ dependencies = [
  "tonic-reflection",
  "tower 0.4.13",
  "tracing",
- "which 8.0.0",
  "zcash_address 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "zcash_keys 0.10.1",
  "zcash_primitives 0.24.1",
@@ -9076,8 +9058,7 @@ dependencies = [
 [[package]]
 name = "zebra-script"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a76a2e972e414caa3635b8c2d21f20c21a71c69f76b37bf7419d97ed0c2277e7"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "thiserror 2.0.17",
  "zcash_primitives 0.24.1",
@@ -9088,8 +9069,7 @@ dependencies = [
 [[package]]
 name = "zebra-state"
 version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "129b32692f22207719dd1c5ddcbae59b96a322e2329664787f6247acef78c7f3"
+source = "git+https://github.com/zingolabs/zebra.git?rev=1168a2f391a17f3ccab65a095d9219b7455d0fea#1168a2f391a17f3ccab65a095d9219b7455d0fea"
 dependencies = [
  "bincode",
  "chrono",
@@ -9278,7 +9258,7 @@ dependencies = [
 [[package]]
 name = "zingo_common_components"
 version = "0.1.0"
-source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#c5100848657acdd079f2cef98f7e5925fb4ee5aa"
+source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#3434eef4f690194385d8b43fc2ad256002a828b0"
 dependencies = [
  "zebra-chain",
 ]
@@ -9286,7 +9266,7 @@ dependencies = [
 [[package]]
 name = "zingo_netutils"
 version = "0.1.0"
-source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#c5100848657acdd079f2cef98f7e5925fb4ee5aa"
+source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#3434eef4f690194385d8b43fc2ad256002a828b0"
 dependencies = [
  "http",
  "http-body",
@@ -9308,7 +9288,7 @@ dependencies = [
 [[package]]
 name = "zingo_test_vectors"
 version = "0.0.1"
-source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#c5100848657acdd079f2cef98f7e5925fb4ee5aa"
+source = "git+https://github.com/Oscar-Pepper/infrastructure.git?branch=cargo_update_for_zln_v0#3434eef4f690194385d8b43fc2ad256002a828b0"
 dependencies = [
  "bip0039",
 ]
