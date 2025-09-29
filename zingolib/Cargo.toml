@@ -28,7 +28,7 @@ pepper-sync = { workspace = true }
 zingo-price = { workspace = true }
 zingo_common_components = { workspace = true, optional = true }
 # testutils feature
-zingo_test_vectors = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0", optional = true }
+zingo_test_vectors = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0_zcash_prim_override", optional = true }
 
 hyper-rustls = { workspace = true }
 hyper-util = { workspace = true }

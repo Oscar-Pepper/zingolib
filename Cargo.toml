@@ -37,7 +37,8 @@ zcash_keys = { git = "https://github.com/zcash/librustzcash", rev = "d387aed7e04
     "orchard",
 ] }
 zcash_note_encryption = "0.4.1"
-zcash_primitives = { git = "https://github.com/zcash/librustzcash", rev = "d387aed7e04e881dbe30c6ff8b26a96c834c094b" }
+# zcash_primitives = { git = "https://github.com/zcash/librustzcash", rev = "d387aed7e04e881dbe30c6ff8b26a96c834c094b" }
+zcash_primitives = "0.24"
 zcash_proofs = { git = "https://github.com/zcash/librustzcash", rev = "d387aed7e04e881dbe30c6ff8b26a96c834c094b" }
 zcash_protocol = { git = "https://github.com/zcash/librustzcash", rev = "d387aed7e04e881dbe30c6ff8b26a96c834c094b", features = [
     "local-consensus",
@@ -46,11 +47,11 @@ zcash_transparent = { git = "https://github.com/zcash/librustzcash", rev = "d387
 
 zebra-chain = { git = "https://github.com/zingolabs/zebra.git" , rev = "1168a2f391a17f3ccab65a095d9219b7455d0fea" }
 
-zingo_netutils = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0" }
-zingo_common_components = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0" }
+zingo_netutils = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0_zcash_prim_override" }
+zingo_common_components = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0_zcash_prim_override" }
 
 # SHOULD BE TESTONLY
-zcash_local_net = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0" }
+zcash_local_net = { git = "https://github.com/Oscar-Pepper/infrastructure.git", branch = "cargo_update_for_zln_v0_zcash_prim_override" }
 
 append-only-vec = "0.1.7"
 bech32 = "0.11.0"
