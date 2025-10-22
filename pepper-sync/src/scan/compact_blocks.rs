@@ -435,9 +435,11 @@ pub(crate) async fn calculate_block_tree_bounds(
 
             match compact_block.height().cmp(&sapling_activation_height) {
                 cmp::Ordering::Greater => {
+                    dbg!("try 1");
                     let frontiers =
                         client::get_frontiers(fetch_request_sender.clone(), compact_block.height())
                             .await?;
+                    dbg!("success 1");
                     (
                         frontiers
                             .final_sapling_tree()

@@ -85,12 +85,14 @@ pub(crate) async fn scan_transactions(
             continue;
         }
 
+        dbg!("try 2");
         let (transaction, block_height) = client::get_transaction_and_block_height(
             fetch_request_sender.clone(),
             consensus_parameters,
             scan_target.txid,
         )
         .await?;
+        dbg!("success 2");
 
         if transaction.txid() != scan_target.txid {
             #[cfg(feature = "darkside_test")]
@@ -110,12 +112,15 @@ pub(crate) async fn scan_transactions(
         let wallet_block = if let Some(wallet_block) = wallet_blocks.get(&block_height) {
             wallet_block.clone()
         } else {
-            WalletBlock::from_compact_block(
+            dbg!("try 3");
+            let wb = WalletBlock::from_compact_block(
                 consensus_parameters,
                 fetch_request_sender.clone(),
                 &client::get_compact_block(fetch_request_sender.clone(), block_height).await?,
             )
-            .await?
+            .await?;
+            dbg!("success 3");
+            wb
         };
 
         let confirmation_status = ConfirmationStatus::Confirmed(block_height);
