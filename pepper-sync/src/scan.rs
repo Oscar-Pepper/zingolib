@@ -199,6 +199,7 @@ where
     } = scan_data;
 
     scan_targets.append(&mut decrypted_scan_targets);
+    dbg!(scan_targets.clone());
 
     let mut outpoints = BTreeMap::new();
     let wallet_transactions = scan_transactions(
