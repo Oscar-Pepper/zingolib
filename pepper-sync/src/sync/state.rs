@@ -453,7 +453,7 @@ fn determine_block_range(
                     .expect("scan range should not be empty")
             };
             let end = sync_state
-                .wallet_height()
+                .last_max_targeted_height()
                 .expect("scan range should not be empty")
                 + 1;
 

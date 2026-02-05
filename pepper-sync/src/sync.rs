@@ -591,17 +591,17 @@ where
     P: zcash_protocol::consensus::Parameters,
 {
     let sync_state = wallet.get_sync_state().map_err(SyncError::WalletError)?;
-    dbg!(&sync_state.wallet_height());
-    if let Some(mut wallet_height) = sync_state.wallet_height() {
-        if wallet_height > proxy_reported_chain_height {
-            if wallet_height - proxy_reported_chain_height >= MAX_VERIFICATION_WINDOW {
+    dbg!(&sync_state.last_max_targeted_height());
+    if let Some(mut last_max_targeted_height) = sync_state.last_max_targeted_height() {
+        if last_max_targeted_height > proxy_reported_chain_height {
+            if last_max_targeted_height - proxy_reported_chain_height >= MAX_VERIFICATION_WINDOW {
                 return Err(SyncError::ChainError(MAX_VERIFICATION_WINDOW));
             }
             truncate_wallet_data(wallet, proxy_reported_chain_height)?;
-            wallet_height = proxy_reported_chain_height;
+            last_max_targeted_height = proxy_reported_chain_height;
         }
 
-        Ok(wallet_height)
+        Ok(last_max_targeted_height)
     } else {
         let birthday =
             checked_birthday(consensus_parameters, wallet).map_err(SyncError::WalletError)?;
@@ -678,7 +678,7 @@ where
         .wallet_birthday()
         .ok_or(SyncStatusError::NoSyncData)?;
     let wallet_height = sync_state
-        .wallet_height()
+        .last_max_targeted_height()
         .ok_or(SyncStatusError::NoSyncData)?;
     let total_blocks = wallet_height - birthday + 1;
     let total_sapling_outputs = sync_state
@@ -1150,7 +1150,7 @@ where
                     .get_sync_state_mut()
                     .map_err(SyncError::WalletError)?;
                 let wallet_height = sync_state
-                    .wallet_height()
+                    .last_max_targeted_height()
                     .expect("scan ranges should be non-empty in this scope");
 
                 // reset scan range from `Scanning` to `Verify`
@@ -1211,7 +1211,7 @@ where
     let mempool_height = wallet
         .get_sync_state()
         .map_err(SyncError::WalletError)?
-        .wallet_height()
+        .last_max_targeted_height()
         .expect("wallet height must exist after sync is initialised")
         + 1;
 
@@ -1729,7 +1729,7 @@ where
     let wallet_height = wallet
         .get_sync_state()
         .map_err(SyncError::WalletError)?
-        .wallet_height()
+        .last_max_targeted_height()
         .expect("wallet height must exist after scan ranges have been updated");
     let wallet_transactions = wallet
         .get_wallet_transactions_mut()

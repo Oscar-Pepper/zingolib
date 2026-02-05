@@ -132,7 +132,7 @@ where
         .read()
         .await
         .sync_state
-        .wallet_height()
+        .last_max_targeted_height()
         .unwrap();
     timestamped_test_log(format!("wallet height at send {wallet_height_at_send}").as_str());
 
@@ -265,7 +265,7 @@ where
             .read()
             .await
             .sync_state
-            .wallet_height()
+            .last_max_targeted_height()
             .unwrap();
         timestamped_test_log(format!("wallet height now {wallet_height_at_confirmation}").as_str());
         timestamped_test_log("cross-checking confirmed records.");
