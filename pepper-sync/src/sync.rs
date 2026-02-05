@@ -608,9 +608,10 @@ where
 }
 #[cfg(test)]
 mod test {
-
+    use crate::mocks;
     #[tokio::test]
     async fn my_first_test() {
+        //let test_wallet = create_test_wallet();
         assert_eq!(2, 2);
     }
 }
