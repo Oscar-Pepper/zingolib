@@ -918,7 +918,7 @@ async fn process_scan_results<W>(
     ufvks: &HashMap<AccountId, UnifiedFullViewingKey>,
     scan_range: ScanRange,
     scan_results: Result<ScanResults, ScanError>,
-    initial_verification_height: BlockHeight,
+    lowest_unscanned_height: BlockHeight,
     performance_level: PerformanceLevel,
     nullifier_map_limit_exceeded: &mut bool,
 ) -> Result<(), SyncError<W::Error>>
@@ -1170,7 +1170,7 @@ where
                 .start;
                 state::merge_scan_ranges(sync_state, ScanPriority::Verify);
 
-                if initial_verification_height - verification_start > MAX_VERIFICATION_WINDOW {
+                if lowest_unscanned_height - verification_start > MAX_VERIFICATION_WINDOW {
                     clear_wallet_data(wallet)?;
 
                     return Err(ServerError::ChainVerificationError.into());
