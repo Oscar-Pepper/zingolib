@@ -357,11 +357,16 @@ where
     // pre-sync initialisation
     let mut wallet_guard = wallet.write().await;
 
-    let chain_height = client::get_chain_height(fetch_request_sender.clone()).await?;
-    if chain_height == 0.into() {
+    let proxy_reported_chain_height =
+        client::get_chain_height(fetch_request_sender.clone()).await?;
+    if proxy_reported_chain_height == 0.into() {
         return Err(SyncError::ServerError(ServerError::GenesisBlockOnly));
     }
-    let wallet_height = constrained_height(&mut *wallet_guard, chain_height, consensus_parameters)?;
+    let wallet_height = constrained_height(
+        &mut *wallet_guard,
+        proxy_reported_chain_height,
+        consensus_parameters,
+    )?;
 
     let ufvks = wallet_guard
         .get_unified_full_viewing_keys()
@@ -373,7 +378,7 @@ where
         fetch_request_sender.clone(),
         &ufvks,
         wallet_height,
-        chain_height,
+        proxy_reported_chain_height,
         config.transparent_address_discovery,
     )
     .await?;
@@ -396,7 +401,7 @@ where
     state::update_scan_ranges(
         consensus_parameters,
         wallet_height,
-        chain_height,
+        proxy_reported_chain_height,
         wallet_guard
             .get_sync_state_mut()
             .map_err(SyncError::WalletError)?,
@@ -407,7 +412,7 @@ where
         consensus_parameters,
         fetch_request_sender.clone(),
         &mut *wallet_guard,
-        chain_height,
+        proxy_reported_chain_height,
     )
     .await?;
 
