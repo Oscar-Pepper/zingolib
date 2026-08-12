@@ -2228,9 +2228,11 @@ impl Command for SettingsCommand {
                     r"
 performance: {}
 min confirmations: {}
+transparent gap limit: {}
             ",
                     wallet.wallet_settings.sync_config.performance_level,
                     wallet.wallet_settings.min_confirmations,
+                    wallet.wallet_settings.sync_config.transparent_address_discovery.gap_limit,
                 ));
             }
 
@@ -2265,6 +2267,18 @@ min confirmations: {}
                         }
                     };
                     wallet.wallet_settings.min_confirmations = min_confirmations;
+                }
+                "transparent_gap_limit" => {
+                    let gap_limit = match args[1].parse::<u8>() {
+                        Ok(m) => m,
+                        Err(_) => {
+                            return Err(CommandError::NotYetTyped(
+                                "invalid arguments\nTry 'help settings' for correct usage and examples"
+                                    .to_string(),
+                            ));
+                        }
+                    };
+                    wallet.wallet_settings.sync_config.transparent_address_discovery.gap_limit = gap_limit;
                 }
                 _ => {
             return Err(CommandError::NotYetTyped(
